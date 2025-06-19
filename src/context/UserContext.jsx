@@ -8,6 +8,7 @@ const UserContext = createContext({
   logoUrl: null,
   isAuthenticated: false,
   login: () => {},
+  logout: () => {},
 });
 
 export const useUserContext = () => useContext(UserContext);
@@ -31,8 +32,15 @@ export default function UserProvider({ children }) {
     }));
   };
 
+  const logout = () => {
+    setState((prev) => ({
+      ...prev,
+      isAuthenticated: false,
+    }));
+  };
+
   return (
-    <UserContext.Provider value={{ ...state, login }}>
+    <UserContext.Provider value={{ ...state, login, logout }}>
       {children}
     </UserContext.Provider>
   );
