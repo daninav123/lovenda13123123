@@ -1,11 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Gantt, ViewMode } from 'gantt-task-react';
+
+// ICS y utilidades de calendario
+function formatICalDate(date) {
+  const pad = n => String(n).padStart(2,'0');
+  return `${date.getUTCFullYear()}${pad(date.getUTCMonth()+1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
+}
+
+function generateFullICS(events) {
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Lovenda//WeddingApp//ES'];
+  events.forEach(evt => {
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:${evt.id}`);
+    lines.push(`DTSTAMP:${formatICalDate(new Date())}`);
+    lines.push(`DTSTART:${formatICalDate(evt.start)}`);
+    lines.push(`DTEND:${formatICalDate(evt.end)}`);
+    lines.push(`SUMMARY:${evt.title}`);
+    if (evt.desc) lines.push(`DESCRIPTION:${evt.desc}`);
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+const downloadAllICS = (events) => {
+  const icsContent = generateFullICS(events);
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'calendario_wedding.ics';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import format from 'date-fns/format';
 import parse from 'date-fns/parse';
 import startOfWeek from 'date-fns/startOfWeek';
 import getDay from 'date-fns/getDay';
 import 'gantt-task-react/dist/index.css';
+import './Tasks.css';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { es } from 'date-fns/locale/es';
 
@@ -69,16 +104,45 @@ const meetings = [
 export default function Tasks() {
   const [currentView, setCurrentView] = useState('month');
   const allEvents = [ ...meetings, ...tasks.map(task => ({ id: task.id, title: task.name, start: task.start, end: task.end, type: 'task', desc: `Progreso: ${task.progress}%`, category: task.category })) ];
+
+  // Notificaciones push para eventos
+  useEffect(() => {
+    if (!('Notification' in window)) return;
+    Notification.requestPermission().then(perm => {
+      if (perm === 'granted') {
+        allEvents.forEach(evt => {
+          const now = new Date();
+          const timeToEvent = evt.start - now - 10 * 60 * 1000; // 10 min antes
+          if (timeToEvent > 0) {
+            setTimeout(() => {
+              new Notification(`Próximo evento: ${evt.title}`, { body: `Empieza a las ${evt.start.toLocaleTimeString()}` });
+            }, timeToEvent);
+          }
+        });
+      }
+    });
+  }, [allEvents]);
   const safeEvents = allEvents.map(event => ({ ...event, start: event.start instanceof Date ? event.start : new Date(event.start), end: event.end instanceof Date ? event.end : new Date(event.end) }));
 
   return (
     <div className="p-4 md:p-6 space-y-8">
-      <h1 className="text-2xl font-bold text-gray-800">Gestión de Tareas y Eventos</h1>
+      <style>{` 
+        ._1nBOt > *:nth-child(n+2),
+        ._34SS0 > *:nth-child(n+2) {
+          display: none !important;
+        }
+      `}</style>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-800">Gestión de Tareas y Eventos</h1>
+        <button onClick={() => downloadAllICS(allEvents)} className="bg-blue-600 text-white px-3 py-1 rounded">
+          Exportar calendario (.ics)
+        </button>
+      </div>
 
       <div className="bg-white rounded-xl shadow-md p-6">
         <h2 className="text-xl font-semibold mb-4">Vista del Proyecto</h2>
-        <div className="overflow-x-auto">
-          <Gantt tasks={tasks} viewMode={ViewMode.Month} listCellWidth="" columnWidth={300} locale="es" barFill={60} barCornerRadius={4} barProgressColor="#4f46e5" barProgressSelectedColor="#4338ca" barBackgroundColor="#a5b4fc" barBackgroundSelectedColor="#818cf8" todayColor="rgba(252,165,165,0.2)" />
+        <div className="overflow-x-hidden">
+          <Gantt tasks={tasks} viewMode={ViewMode.Month} listCellWidth={100} columnWidth={40} locale="es" barFill={60} barCornerRadius={4} barProgressColor="#4f46e5" barProgressSelectedColor="#4338ca" barBackgroundColor="#a5b4fc" barBackgroundSelectedColor="#818cf8" todayColor="rgba(252,165,165,0.2)" />
         </div>
       </div>
 

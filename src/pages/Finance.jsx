@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { getTransactions } from '../services/bankService';
 import { Plus } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { LineChart, Line, XAxis as LineXAxis, YAxis as LineYAxis, CartesianGrid as LineCartesianGrid, Tooltip as LineTooltip, Legend as LineLegend } from 'recharts';
-import { PieChart, Pie, Sector, Cell } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
+
+
 
 export default function Finance() {
   const [transactions, setTransactions] = useState([]);
@@ -14,6 +15,10 @@ export default function Finance() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [monthlyContrib, setMonthlyContrib] = useState(0);
+  const [expectedIncome, setExpectedIncome] = useState(0);
+  const paidTotal = transactions.filter(t => t.status === 'paid').reduce((s, t) => s + t.realCost, 0);
+  const outstandingTotal = transactions.filter(t => t.status !== 'paid').reduce((s, t) => s + t.estimatedCost, 0);
 
   useEffect(() => {
     getTransactions()
@@ -48,6 +53,14 @@ export default function Finance() {
     { name: 'Ingresos', value: totals.income },
   ];
 
+  const projectedData = React.useMemo(() => {
+    let balance = totals.income - totals.expense;
+    return data.map(item => {
+      balance += monthlyContrib + expectedIncome / data.length - item.expense + item.income;
+      return { name: item.name, projected: parseFloat(balance.toFixed(2)) };
+    });
+  }, [data, totals, monthlyContrib, expectedIncome]);
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Finanzas</h1>
@@ -67,7 +80,66 @@ export default function Finance() {
         </div>
       </div>
 
+      {/* Dashboard de Análisis */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-2">Evolución Mensual</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="income" fill="#82ca9d" />
+              <Bar dataKey="expense" fill="#8884d8" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-2">Distribución Ingresos/Gastos</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                {pieData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={index === 0 ? '#8884d8' : '#82ca9d'} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-2">Previsión de Saldo</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={projectedData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey="projected" stroke="#ff7300" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
       {/* Filtros y Tabla */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded shadow">
+          <p className="text-sm text-gray-500">Contribución mensual</p>
+          <input type="number" value={monthlyContrib} onChange={e => setMonthlyContrib(e.target.value)} className="w-full mt-1 border rounded px-2 py-1" />
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <p className="text-sm text-gray-500">Ingresos esperados</p>
+          <input type="number" value={expectedIncome} onChange={e => setExpectedIncome(e.target.value)} className="w-full mt-1 border rounded px-2 py-1" />
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <p className="text-sm text-gray-500">Monto pagado</p>
+          <p className="text-xl font-bold">€{paidTotal.toFixed(2)}</p>
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <p className="text-sm text-gray-500">Pendiente</p>
+          <p className="text-xl font-bold">€{outstandingTotal.toFixed(2)}</p>
+        </div>
+      </div>
       <div className="bg-white p-4 rounded shadow space-y-4">
         <div className="flex flex-wrap gap-2 mb-4">
           <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="border rounded px-2 py-1">
@@ -116,37 +188,7 @@ export default function Finance() {
         </div>
       </div>
 
-      {/* Gráficos */}
-      <div className="flex gap-4 overflow-x-auto">
-        <div className="w-1/3 h-48 bg-white rounded shadow">
-          <BarChart width={400} height={200} data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="income" fill="#8884d8" />
-            <Bar dataKey="expense" fill="#82ca9d" />
-          </BarChart>
-        </div>
-        <div className="w-1/3 h-48 bg-white rounded shadow">
-          <LineChart width={400} height={200} data={data}>
-            <LineCartesianGrid strokeDasharray="3 3" />
-            <LineXAxis dataKey="name" />
-            <LineYAxis />
-            <LineTooltip />
-            <LineLegend />
-            <Line type="monotone" dataKey="income" stroke="#8884d8" />
-            <Line type="monotone" dataKey="expense" stroke="#82ca9d" />
-          </LineChart>
-        </div>
-        <div className="w-1/3 h-48 bg-white rounded shadow">
-          <PieChart width={400} height={200}>
-            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} fill="#8884d8" />
-            <Tooltip />
-          </PieChart>
-        </div>
-      </div>
+
 
       {/* Botones de acción */}
       <button className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg" onClick={() => setModalOpen(true)}>

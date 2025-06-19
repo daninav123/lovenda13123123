@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { Search, Users, Briefcase, Clock, User } from 'lucide-react';
+import { Search, Users, Briefcase, Clock, User, Layers } from 'lucide-react';
 
 export default function More() {
   const [openMenu, setOpenMenu] = useState(null);
@@ -59,7 +59,20 @@ export default function More() {
             </div>
           )}
         </div>
-        <Link to="perfil" className="bg-white p-4 rounded shadow hover:shadow-md flex flex-col">
+        <div className="relative">
+          <button onClick={() => setOpenMenu(openMenu==='extras'?null:'extras')} className="bg-white p-4 rounded shadow hover:shadow-md flex flex-col text-left w-full">
+            <Layers size={32} className="text-blue-600 mb-2" />
+            <h2 className="font-semibold mb-1">Extras</h2>
+            <p className="text-sm text-gray-600">Diseño web e ideas</p>
+          </button>
+          {openMenu==='extras' && (
+            <div className="absolute bg-white border border-gray-200 rounded shadow mt-2 w-full z-10">
+              <Link to="/diseno-web" className="block px-4 py-2 hover:bg-gray-100">Diseño Web</Link>
+              <Link to="/ideas" className="block px-4 py-2 hover:bg-gray-100">Ideas</Link>
+            </div>
+          )}
+        </div>
+        <Link to="/perfil" className="bg-white p-4 rounded shadow hover:shadow-md flex flex-col">
           <User size={32} className="text-blue-600 mb-2" />
           <h2 className="font-semibold mb-1">Perfil</h2>
           <p className="text-sm text-gray-600">Configura tu cuenta, roles y suscripciones.</p>

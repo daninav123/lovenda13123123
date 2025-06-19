@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { useUserContext } from '../context/UserContext';
 import Nav from './Nav';
+import ChatWidget from './ChatWidget';
 
 export default function MainLayout() {
   const { logoUrl, logout } = useUserContext();
@@ -22,6 +23,7 @@ export default function MainLayout() {
         <Outlet />
       </main>
       <Nav />
+        <ChatWidget />
     </div>
   );
 }

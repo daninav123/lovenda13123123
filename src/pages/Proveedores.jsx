@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Search, RefreshCcw, Plus, Eye, Edit2, Trash2, Calendar, Download, Cpu } from 'lucide-react';
+import { Search, RefreshCcw, Plus, Eye, Edit2, Trash2, Calendar, Download, Cpu, Star } from 'lucide-react';
 
 export default function Proveedores() {
   const sampleProviders = [
-    { id: 1, name: 'Eventos Catering', service: 'Catering', contact: 'Luis Pérez', email: 'luis@catering.com', phone: '555-1234', status: 'Contactado', date: '2025-06-10' },
-    { id: 2, name: 'Flores y Diseño', service: 'Flores', contact: 'Ana Gómez', email: 'ana@flores.com', phone: '555-5678', status: 'Confirmado', date: '2025-06-12' },
+    { id: 1, name: 'Eventos Catering', service: 'Catering', contact: 'Luis Pérez', email: 'luis@catering.com', phone: '555-1234', status: 'Contactado', date: '2025-06-10', rating: 0, ratingCount: 0 },
+    { id: 2, name: 'Flores y Diseño', service: 'Flores', contact: 'Ana Gómez', email: 'ana@flores.com', phone: '555-5678', status: 'Confirmado', date: '2025-06-12', rating: 0, ratingCount: 0 },
   ];
   const [providers, setProviders] = useState(sampleProviders);
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,6 +17,35 @@ export default function Proveedores() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [detailProvider, setDetailProvider] = useState(null);
+  const [reservations, setReservations] = useState([]);
+  const [showResModal, setShowResModal] = useState(false);
+  const [providerToReserve, setProviderToReserve] = useState(null);
+  const [resDate, setResDate] = useState('');
+  const [resTime, setResTime] = useState('');
+
+  const openResModal = (p) => {
+    setProviderToReserve(p);
+    setResDate('');
+    setResTime('');
+    setShowResModal(true);
+  };
+
+  const confirmReservation = () => {
+    if (providerToReserve && resDate && resTime) {
+      const dt = new Date(resDate + 'T' + resTime);
+      setReservations(prev => [...prev, { providerId: providerToReserve.id, datetime: dt }]);
+      setShowResModal(false);
+    }
+  };
+
+  const rateProvider = (id, ratingValue) => {
+    setProviders(prev => prev.map(p =>
+      p.id === id ? { ...p,
+        ratingCount: p.ratingCount + 1,
+        rating: (p.rating * p.ratingCount + ratingValue) / (p.ratingCount + 1)
+      } : p
+    ));
+  };
 
   const filtered = providers.filter(p =>
     (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service.toLowerCase().includes(searchTerm.toLowerCase())) &&
@@ -122,6 +151,7 @@ export default function Proveedores() {
               <th className="p-2">Teléfono</th>
               <th className="p-2">Estado</th>
               <th className="p-2">Fecha</th>
+              <th className="p-2">Valoración</th>
               <th className="p-2">Acciones</th>
             </tr>
           </thead>
@@ -138,11 +168,18 @@ export default function Proveedores() {
                 <td className="p-2">{p.phone}</td>
                 <td className="p-2 cursor-pointer">{p.status}</td>
                 <td className="p-2 cursor-pointer">{p.date}</td>
+                <td className="p-2">
+                  {[1,2,3,4,5].map(i => (
+                    <Star key={i} size={16} className="cursor-pointer" color={i <= Math.round(p.rating) ? '#facc15' : '#e5e7eb'} onClick={() => rateProvider(p.id, i)} />
+                  ))}
+                  <span className="text-sm text-gray-600 ml-1">({p.ratingCount})</span>
+                </td>
                 <td className="p-2 flex gap-2">
                   <Eye size={16} className="cursor-pointer text-gray-600" />
                   <Edit2 size={16} className="cursor-pointer text-blue-600" />
                   <Trash2 size={16} className="cursor-pointer text-red-600" />
-                  <Calendar size={16} className="cursor-pointer text-green-600" />
+                  <Calendar size={16} className="cursor-pointer text-green-600" onClick={() => openResModal(p)} />
+                  <span className="text-sm text-gray-600 ml-1">{reservations.filter(r => r.providerId === p.id).length}</span>
                   <Download size={16} className="cursor-pointer text-purple-600" />
                 </td>
               </tr>

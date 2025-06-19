@@ -7,8 +7,14 @@ const UserContext = createContext({
   progress: 50,
   logoUrl: null,
   isAuthenticated: false,
+  email: '',
   login: () => {},
-  logout: () => {},
+  updateProfile: () => {},
+  partnerName: '',
+  partnerEmail: '',
+  weddingDate: '',
+  venue: '',
+  themeColor: '#aabbcc',
 });
 
 export const useUserContext = () => useContext(UserContext);
@@ -21,6 +27,12 @@ export default function UserProvider({ children }) {
     progress: 50,
     logoUrl: null,
     isAuthenticated: false,
+    email: '',
+    partnerName: '',
+    partnerEmail: '',
+    weddingDate: '',
+    venue: '',
+    themeColor: '#aabbcc',
   });
 
   const login = (name) => {
@@ -32,15 +44,12 @@ export default function UserProvider({ children }) {
     }));
   };
 
-  const logout = () => {
-    setState((prev) => ({
-      ...prev,
-      isAuthenticated: false,
-    }));
+  const updateProfile = (profile) => {
+    setState(prev => ({ ...prev, ...profile }));
   };
 
   return (
-    <UserContext.Provider value={{ ...state, login, logout }}>
+    <UserContext.Provider value={{ ...state, login, updateProfile }}>
       {children}
     </UserContext.Provider>
   );
