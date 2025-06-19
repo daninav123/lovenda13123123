@@ -11,6 +11,20 @@ export default function Invitados() {
   const [rsvpFilter, setRsvpFilter] = useState('');
   const [tableFilter, setTableFilter] = useState('');
   const [selected, setSelected] = useState([]);
+const statuses = ['Pendiente', 'Sí', 'No'];
+const getNextStatus = curr => {
+  const idx = statuses.indexOf(curr);
+  return statuses[(idx + 1) % statuses.length];
+};
+const sendBulkEmails = () => {
+  const recipients = selected
+    .map(id => guests.find(g => g.id === id)?.email)
+    .filter(Boolean)
+    .join(',');
+  if (recipients) {
+    window.open('mailto:' + recipients + '?subject=Recordatorio boda&body=¡Hola! Te esperamos en nuestra boda.');
+  }
+};
   const [showModal, setShowModal] = useState(false);
 
   const filtered = guests.filter(g => {
@@ -70,7 +84,7 @@ export default function Invitados() {
       {/* Bulk Actions */}
       {selected.length > 0 && (
         <div className="bg-gray-100 p-2 rounded flex gap-2">
-          <button className="bg-green-600 text-white px-3 py-1 rounded">Enviar recordatorio ({selected.length})</button>
+          <button onClick={sendBulkEmails} className="bg-green-600 text-white px-3 py-1 rounded">Enviar recordatorio ({selected.length})</button>
           <select className="border rounded px-2 py-1">
             <option>Asignar mesa</option>
             {[...new Set(filtered.map(g => g.table))].map(table => (
@@ -113,13 +127,13 @@ export default function Invitados() {
                 </td>
                 <td className="p-2">{g.email}</td>
                 <td className="p-2">{g.phone}</td>
-                <td className="p-2 cursor-pointer">{g.rsvp}</td>
+                <td className="p-2 cursor-pointer" onClick={() => setGuests(prev => prev.map(x => x.id === g.id ? { ...x, rsvp: getNextStatus(x.rsvp) } : x))}>{g.rsvp}</td>
                 <td className="p-2 cursor-pointer">{g.guests}</td>
                 <td className="p-2">{g.table || '-'}</td>
                 <td className="p-2 flex gap-2">
                   <Edit2 size={16} className="cursor-pointer text-blue-600" />
                   <Trash2 size={16} className="cursor-pointer text-red-600" />
-                  <Mail size={16} className="cursor-pointer text-green-600" />
+                  <Mail size={16} className="cursor-pointer text-green-600" onClick={() => window.open('mailto:' + g.email + '?subject=Recordatorio boda&body=¡Hola ' + g.name + ', te esperamos en nuestra boda!')} />
                 </td>
               </tr>
             ))}

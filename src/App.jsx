@@ -18,6 +18,8 @@ import MomentosEspeciales from './pages/MomentosEspeciales';
 import Timing from './pages/Timing';
 import Checklist from './pages/Checklist';
 import AyudaCeremonia from './pages/AyudaCeremonia';
+import DisenoWeb from './pages/DisenoWeb';
+import Ideas from './pages/Ideas';
 
 function ProtectedRoute() {
   const { isAuthenticated } = useUserContext();
@@ -47,19 +49,18 @@ function App() {
               <Route path="timing" element={<Timing />} />
               <Route path="checklist" element={<Checklist />} />
               <Route path="ayuda-ceremonia" element={<AyudaCeremonia />} />
-              
+              <Route path="perfil" element={<Perfil />} />
+               <Route path="diseno-web" element={<DisenoWeb />} />
+               <Route path="ideas" element={<Ideas />} />
               <Route path="more" element={<More />}>
-  <Route index element={<p>Selecciona una sección</p>} />
-
-
-
+                <Route index element={<p>Selecciona una sección</p>} />
+              </Route>
 
 
 
 
   
-  <Route path="perfil" element={<Perfil />} />
-</Route>
+  
               <Route path="*" element={<Navigate to="home" replace />} />
             </Route>
           </Route>

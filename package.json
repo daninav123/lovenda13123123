@@ -9,8 +9,10 @@
   },
   "dependencies": {
     "date-fns": "^4.1.0",
+    "file-saver": "^2.0.5",
     "framer-motion": "^10.12.16",
     "gantt-task-react": "^0.3.9",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.268.0",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",

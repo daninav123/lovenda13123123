@@ -104,9 +104,7 @@ export default function HomePage() {
 
       {/* Inspiration Gallery */}
       <section className="z-10 p-6">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">
-          Galería de Inspiración
-        </h3>
+        
         <div className="relative">
           <button
             onClick={scrollPrev}
@@ -121,7 +119,7 @@ export default function HomePage() {
             {[inspo1, inspo2, inspo3, inspo4].map((src, idx) => (
               <div
                 key={idx}
-                className="flex-shrink-0 w-64 h-40 rounded-xl overflow-hidden shadow-md"
+                className="flex-shrink-0 w-80 h-56 rounded-xl overflow-hidden shadow-md"
               >
                 <img
                   src={src}
