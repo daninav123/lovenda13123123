@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { MessageSquare } from 'lucide-react';
 
 export default function ChatWidget() {
@@ -36,18 +37,18 @@ export default function ChatWidget() {
               className="flex-1 border rounded px-2 py-1"
               placeholder="Escribe..."
             />
-            <button onClick={sendMessage} className="ml-2 bg-blue-600 text-white px-3 rounded">
+            <motion.button onClick={sendMessage} className="ml-2 bg-blue-600 text-white px-3 rounded">
               Enviar
-            </button>
+            </motion.button>
           </div>
         </div>
       )}
-      <button
-        onClick={() => setOpen(!open)}
+      <motion.button
+        onClick={() => setOpen(!open)} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
         className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg z-50"
       >
         <MessageSquare />
-      </button>
+      </motion.button>
     </>
   );
 }

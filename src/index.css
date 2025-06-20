@@ -2,14 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 @layer base {
+  /* Dark mode base styles */
+  .dark body { @apply bg-gray-900 text-gray-100; }
   body {
-    @apply bg-pastel-yellow text-gray-800 font-sans;
+    @apply bg-pastel-yellow text-gray-800 font-sans transition-colors duration-300;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-bold;
   }
   a {
     @apply text-pastel-blue hover:underline;
-    @apply text-blue-600 hover:underline;
+    
   }
 }

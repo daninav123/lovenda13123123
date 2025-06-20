@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Gantt, ViewMode } from 'gantt-task-react';
 
 // ICS y utilidades de calendario
@@ -103,6 +103,23 @@ const meetings = [
 
 export default function Tasks() {
   const [currentView, setCurrentView] = useState('month');
+  const ganttRef = useRef(null);
+  const listCellWidth = 100;
+  const [columnWidthState, setColumnWidthState] = useState(0);
+
+  useEffect(() => {
+    if (!ganttRef.current) return;
+    const containerWidth = ganttRef.current.clientWidth;
+    const dates = tasks.flatMap(t => [t.start, t.end]);
+    const minTime = Math.min(...dates.map(d => d.getTime()));
+    const maxTime = Math.max(...dates.map(d => d.getTime()));
+    const minDate = new Date(minTime);
+    const maxDate = new Date(maxTime);
+    const monthsCount = (maxDate.getFullYear() - minDate.getFullYear()) * 12 + (maxDate.getMonth() - minDate.getMonth()) + 1;
+    const availableWidth = containerWidth - listCellWidth;
+    const cw = Math.min(Math.floor(availableWidth / monthsCount), 80); // cap column width at 80px to avoid horizontal scroll
+    setColumnWidthState(cw);
+  }, [tasks]);
   const allEvents = [ ...meetings, ...tasks.map(task => ({ id: task.id, title: task.name, start: task.start, end: task.end, type: 'task', desc: `Progreso: ${task.progress}%`, category: task.category })) ];
 
   // Notificaciones push para eventos
@@ -141,8 +158,8 @@ export default function Tasks() {
 
       <div className="bg-white rounded-xl shadow-md p-6">
         <h2 className="text-xl font-semibold mb-4">Vista del Proyecto</h2>
-        <div className="overflow-x-hidden">
-          <Gantt tasks={tasks} viewMode={ViewMode.Month} listCellWidth={100} columnWidth={40} locale="es" barFill={60} barCornerRadius={4} barProgressColor="#4f46e5" barProgressSelectedColor="#4338ca" barBackgroundColor="#a5b4fc" barBackgroundSelectedColor="#818cf8" todayColor="rgba(252,165,165,0.2)" />
+        <div ref={ganttRef} className="w-full overflow-hidden">
+          <Gantt tasks={tasks} viewMode={ViewMode.Month} listCellWidth={listCellWidth} columnWidth={columnWidthState} locale="es" barFill={60} barCornerRadius={4} barProgressColor="#4f46e5" barProgressSelectedColor="#4338ca" barBackgroundColor="#a5b4fc" barBackgroundSelectedColor="#818cf8" todayColor="rgba(252,165,165,0.2)" />
         </div>
       </div>
 

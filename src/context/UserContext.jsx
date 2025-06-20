@@ -1,56 +1,74 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { auth } from '../firebaseConfig';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile as fbUpdateProfile,
+} from 'firebase/auth';
+import { db } from '../firebaseConfig';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const UserContext = createContext({
-  role: 'particular',
-  userName: 'Juan y María',
-  weddingName: 'Nuestra Boda',
-  progress: 50,
-  logoUrl: null,
+  user: null,
   isAuthenticated: false,
-  email: '',
-  login: () => {},
-  updateProfile: () => {},
-  partnerName: '',
-  partnerEmail: '',
-  weddingDate: '',
-  venue: '',
-  themeColor: '#aabbcc',
+  loading: true,
+  signup: async () => {},
+  login: async () => {},
+  logout: async () => {},
+  updateProfile: async () => {},
 });
 
 export const useUserContext = () => useContext(UserContext);
 
 export default function UserProvider({ children }) {
-  const [state, setState] = useState({
-    role: 'particular',
-    userName: 'Juan y María',
-    weddingName: 'Nuestra Boda',
-    progress: 50,
-    logoUrl: null,
-    isAuthenticated: false,
-    email: '',
-    partnerName: '',
-    partnerEmail: '',
-    weddingDate: '',
-    venue: '',
-    themeColor: '#aabbcc',
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (name) => {
-    setState((prev) => ({
-      ...prev,
-      userName: name,
-      role: name === 'admin' ? 'admin' : prev.role,
-      isAuthenticated: true,
-    }));
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        const role = userDoc.exists() ? userDoc.data().role : 'particular';
+        setUser({ ...firebaseUser, role });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const signup = async (email, password) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const newUser = userCredential.user;
+    await setDoc(doc(db, 'users', newUser.uid), { role: 'particular', email: newUser.email, createdAt: serverTimestamp() });
+    setUser({ ...newUser, role: 'particular' });
+    return newUser;
   };
 
-  const updateProfile = (profile) => {
-    setState(prev => ({ ...prev, ...profile }));
+  const login = async (email, password) => {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    setUser(userCredential.user);
+    return userCredential.user;
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null);
+  };
+
+  const updateProfile = async (profile) => {
+    if (auth.currentUser) {
+      await fbUpdateProfile(auth.currentUser, profile);
+      setUser({ ...auth.currentUser, ...profile });
+    }
   };
 
   return (
-    <UserContext.Provider value={{ ...state, login, updateProfile }}>
-      {children}
+    <UserContext.Provider value={{ user, isAuthenticated: !!user, loading, signup, login, logout, updateProfile }}>
+      {!loading && children}
     </UserContext.Provider>
   );
 }

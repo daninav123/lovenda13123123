@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Card from '../components/Card';
+import Button from '../components/Button';
 import { useUserContext } from '../context/UserContext';
 
 export default function Perfil() {
@@ -23,11 +25,35 @@ export default function Perfil() {
     setForm({ userName, email, weddingName, logoUrl, partnerName, partnerEmail });
   };
 
+  // Dark mode toggle state and effects
+  const [darkMode, setDarkMode] = useState(false);
+  useEffect(() => {
+    const theme = localStorage.getItem('theme') || 'light';
+    setDarkMode(theme === 'dark');
+  }, []);
+  useEffect(() => {
+    if (darkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [darkMode]);
+  const handleDarkToggle = () => {
+    setDarkMode(prev => {
+      const next = !prev;
+      localStorage.setItem('theme', next ? 'dark' : 'light');
+      return next;
+    });
+  };
+
   return (
-    <div className="p-6 max-w-md mx-auto">
+    <Card className="p-6 max-w-md mx-auto">
       <h1 className="text-2xl font-semibold mb-4">Editar Perfil</h1>
       {status && <p className="text-green-600 mb-2">{status}</p>}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+  <label className="flex items-center gap-2">
+    <input type="checkbox" checked={darkMode} onChange={handleDarkToggle} className="rounded" />
+    Modo Oscuro
+  </label>
+</div>
+<form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium">Nombre</label>
           <input
@@ -85,24 +111,24 @@ export default function Perfil() {
           />
         </div>
         <div className="flex space-x-2">
-          <button
+          <Button
             type="button"
-            onClick={handleCancel}
+            variant="secondary" onClick={handleCancel}
             className="px-4 py-2 bg-gray-300 rounded"
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded"
           >
             Guardar
-          </button>
-          <button type="button" onClick={() => window.location.href = `mailto:${form.partnerEmail}?subject=Invitación a tu pareja`} disabled={!form.partnerEmail} className="px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50">
+          </Button>
+          <Button type="button" variant="success" onClick={() => window.location.href = `mailto:${form.partnerEmail}?subject=Invitación a tu pareja`} disabled={!form.partnerEmail} className="px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50">
             Enviar Invitación
-          </button>
+          </Button>
         </div>
       </form>
-    </div>
+    </Card>
   );
 }
