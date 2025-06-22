@@ -305,6 +305,7 @@ export default function Finance() {
             />
           </div>
         </div>
+        </div>
         
         {/* Tabla de transacciones */}
         <div className="overflow-x-auto">
@@ -446,16 +447,17 @@ export default function Finance() {
                     </svg>
                   </button>
                 </nav>
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
 
-      {/* Botón flotante para agregar transacciones */}
-      <Button 
-        className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg z-50 transition-all duration-200 transform hover:scale-110" 
-        onClick={() => setModalOpen(true)} 
+{/* Tabla de transacciones */}
+<Card className="p-4">
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+    <h3 className="text-lg font-semibold">Últimas Transacciones</h3>
+    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+      <select 
+        className="text-sm border rounded px-2 py-1 w-full sm:w-auto" 
+        value={statusFilter} 
+        onChange={(e) => setStatusFilter(e.target.value)}
+        aria-label="Filtrar por estado"
         aria-label="Agregar transacción"
       >
         <Plus className="w-6 h-6" />

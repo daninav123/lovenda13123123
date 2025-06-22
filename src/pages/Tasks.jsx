@@ -102,8 +102,12 @@ const meetings = [
 ];
 
 export default function Tasks() {
-  const [currentView, setCurrentView] = useState('month');
+  const [currentView, setCurrentView] = useState(() => localStorage.getItem('tasksView') || 'month');
   const ganttRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('tasksView', currentView);
+  }, [currentView]);
   const listCellWidth = 40; // restored minimal list column width to maintain grid alignment // hide name column entirely
   const [columnWidthState, setColumnWidthState] = useState(0);
 

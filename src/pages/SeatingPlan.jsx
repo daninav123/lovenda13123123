@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Cpu } from 'lucide-react';
-import { DndProvider } from 'react-dnd';
+import Spinner from '../components/Spinner';
+import Toast from '../components/Toast';
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 export default function SeatingPlan() {
   const [searchTerm, setSearchTerm] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [toast, setToast] = useState(null);
   // Tab state for seating plan
   const [activeTab, setActiveTab] = useState('ceremony');
   // Tables for ceremony and banquet
@@ -33,6 +37,40 @@ export default function SeatingPlan() {
   const [seats, setSeats] = useState([]);
   const [shapePoints, setShapePoints] = useState([]);
   const [shapeFinalized, setShapeFinalized] = useState(false);
+
+  // Assign guest to seat on drop
+  const assignGuestToSeat = (guestId, seatId) => {
+    setSeats(prev => prev.map(s => s.id === seatId ? { ...s, assignedGuest: guestId } : s));
+  };
+
+    const handleAutoAssign = async () => {
+    if (!aiPrompt) return;
+    setAiLoading(true);
+    setToast(null);
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + import.meta.env.VITE_OPENAI_KEY },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: 'Eres un asistente que asigna invitados a asientos basado en criterios del usuario. Devuelve un array JSON de objetos { seatId, guestId }.' },
+            { role: 'user', content: 'Criterios: ' + aiPrompt + '. Invitados: ' + JSON.stringify(guests) + '. Asientos: ' + JSON.stringify(seats.map(s => ({ id: s.id, row: s.row, col: s.col }))) }
+          ]
+        })
+      });
+      const data = await response.json();
+      let assignments = [];
+      try { assignments = JSON.parse(data.choices[0].message.content); } catch { console.error('Invalid JSON from AI', data.choices[0].message.content); }
+      assignments.forEach(a => assignGuestToSeat(a.guestId, a.seatId));
+      setToast({ message: 'Asignación completada', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setToast({ message: 'Error en autoasignación', type: 'error' });
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Util: point-in-polygon test
   const isPointInPolygon = (point, vs) => {
@@ -151,6 +189,7 @@ export default function SeatingPlan() {
       </div>
       <h1 className="text-2xl font-semibold">Seating Plan - {activeTab==='ceremony'?'Ceremonia':'Banquete'}</h1>
     <div className="p-6 space-y-6">
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <h1 className="text-2xl font-semibold">Seating Plan</h1>
       <DndProvider backend={HTML5Backend}>
         <div className="flex gap-6">
@@ -167,7 +206,18 @@ export default function SeatingPlan() {
               />
             </div>
             <div className="space-y-2 overflow-auto max-h-[400px]">
-              {filteredGuests.map(g => (
+              {filteredGuests.map(g => {
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: 'GUEST',
+    item: { id: g.id },
+    collect: monitor => ({ isDragging: monitor.isDragging() }),
+  }));
+  return (
+    <div ref={drag} key={g.id} className="border p-2 rounded cursor-move bg-white" style={{ opacity: isDragging ? 0.5 : 1 }}>
+      {g.name}
+    </div>
+  );
+})}
                 <div
                   key={g.id}
                   className="border p-2 rounded cursor-move bg-white"
@@ -241,7 +291,22 @@ export default function SeatingPlan() {
                         />
                       </label>
                     </div>
-                    {seats.map(seat => (
+                    {seats.map(seat => {
+  const [{ isOver, canDrop }, drop] = useDrop(() => ({
+    accept: 'GUEST',
+    drop: item => assignGuestToSeat(item.id, seat.id),
+    collect: monitor => ({ isOver: monitor.isOver(), canDrop: monitor.canDrop() }),
+  }));
+  const bg = isOver && canDrop ? '#e0f7fa' : 'white';
+  return (
+    <div ref={drop} key={seat.id} className="absolute z-10 flex items-center justify-center border" style={{ left: seat.x, top: seat.y, width: 40, height: 40, backgroundColor: bg }}>
+      {seat.assignedGuest
+        ? guests.find(g => g.id === seat.assignedGuest)?.name
+        : <span className="text-xs">{seat.row}-{seat.col}</span>
+      }
+    </div>
+  );
+})}
                       <div
                         key={seat.id}
                         className="absolute z-10 flex items-center justify-center border bg-white"
@@ -286,7 +351,8 @@ export default function SeatingPlan() {
           onChange={e => setAiPrompt(e.target.value)}
           className="border rounded px-2 py-1 flex-1"
         />
-        <button className="bg-purple-600 text-white px-4 py-1 rounded flex items-center">
+        <button onClick={handleAutoAssign} disabled={aiLoading} className="bg-purple-600 text-white px-4 py-1 rounded flex items-center">
+          {aiLoading ? <Spinner /> : (<><Cpu size={16} className="mr-2" />Autoasignar</>)}
           <Cpu size={16} className="mr-2" />Autoasignar
         </button>
         <button className="bg-gray-200 px-4 py-1 rounded">Exportar PDF</button>

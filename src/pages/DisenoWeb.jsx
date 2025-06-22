@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { useUserContext } from '../context/UserContext';
 
 export default function DisenoWeb() {
   const templates = ['Clásico', 'Moderno', 'Minimalista'];
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(() => localStorage.getItem('selectedTemplate') || null);
   const { userName, partnerName, weddingDate, venue, themeColor } = useUserContext();
 
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (selected) localStorage.setItem('selectedTemplate', selected);
+    else localStorage.removeItem('selectedTemplate');
+  }, [selected]);
   const getHtml = () => `<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/><title>Save the Date</title><style>body{font-family:sans-serif;text-align:center;padding:2rem;color:${themeColor}}header{background-color:${themeColor};color:#fff;padding:1rem}section{margin:2rem 0}</style></head><body><header><h1>Save the Date</h1><h2>${userName} & ${partnerName}</h2><p>Plantilla: ${selected}</p></header><section><p>Nos casamos el ${weddingDate} en ${venue}.</p></section><footer><p>¡Te esperamos!</p></footer></body></html>`;
   const generateZip = async () => {
     const html = getHtml();

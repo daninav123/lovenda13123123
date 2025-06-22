@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Spinner from '../components/Spinner';
+import Toast from '../components/Toast';
 import { Search, RefreshCcw, Plus, Eye, Edit2, Trash2, Calendar, Download, Cpu, Star } from 'lucide-react';
 
 export default function Proveedores() {
@@ -13,6 +15,8 @@ export default function Proveedores() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [aiQuery, setAiQuery] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [toast, setToast] = useState(null);
   const [selected, setSelected] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -63,15 +67,42 @@ export default function Proveedores() {
     setSearchTerm(''); setAiQuery(''); setServiceFilter(''); setStatusFilter(''); setDateFrom(''); setDateTo('');
   };
 
-  const handleAiSearch = () => {
-    // TODO: integrar IA para búsquedas avanzadas
-    console.log('Query IA:', aiQuery);
+  const handleAiSearch = async () => {
+    if (!aiQuery) return;
+    setAiLoading(true);
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: 'You are a helpful assistant that filters providers based on user query. Return a JSON array of matching provider IDs.' },
+            { role: 'user', content: `Query: ${aiQuery}. Providers: ${JSON.stringify(sampleProviders)}` }
+          ]
+        })
+      });
+      const data = await response.json();
+      let ids = [];
+      try { ids = JSON.parse(data.choices[0].message.content); } catch { console.error('Invalid JSON from AI', data.choices[0].message.content); }
+      setProviders(sampleProviders.filter(p => ids.includes(p.id)));
+      setToast({ message: 'Proveedores filtrados por IA', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setToast({ message: 'Error al buscar con IA', type: 'error' });
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const openDetail = p => { setDetailProvider(p); setShowDetail(true); };
 
   return (
     <div className="p-6 space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Gestión de Proveedores</h1>
@@ -97,6 +128,7 @@ export default function Proveedores() {
         </div>
         <div className="flex items-center border rounded px-2 py-1">
           <Cpu size={16} className="mr-2 text-gray-600" />
+            {aiLoading && <Spinner className="ml-2" />}
           <input
             type="text"
             placeholder="Buscar IA..."
