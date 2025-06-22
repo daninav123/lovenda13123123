@@ -103,6 +103,20 @@ const [toast, setToast] = useState(null);
       .finally(() => setLoading(false));
   }, []);
 
+  const handleConnectBank = () => {
+    setLoading(true);
+    getTransactions()
+      .then(data => {
+        setTransactions(data);
+        const inc = data.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+        const exp = data.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+        setTotals({ income: inc, expense: exp });
+        setError(null);
+      })
+      .catch(err => { setError(err.message); setToast({ message: err.message, type: 'error' }); })
+      .finally(() => setLoading(false));
+  };
+
   const filteredTransactions = transactions.filter(t => {
     if (categoryFilter && t.category !== categoryFilter) return false;
     if (providerFilter && t.provider !== providerFilter) return false;
@@ -155,28 +169,91 @@ const paginatedTransactions = sortedTransactions.slice((currentPage - 1) * pageS
     [transactions]
   );
 
-  return (
+  return (<>
     <div className="p-6 space-y-6">
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <h1 className="text-2xl font-semibold">Finanzas</h1>
-      {/* Resumen de Cuenta Conjunta */}
-      <div className="flex gap-4">
-        <Card className="flex-1 hover:shadow-lg transform hover:scale-105 transition-shadow transition-transform">
-          <p className="text-sm text-gray-500">Ingresos</p>
-          <p className="text-xl font-bold">€{totals.income.toFixed(2)}</p>
-        </Card>
-        <Card className="flex-1 hover:shadow-lg transform hover:scale-105 transition-shadow transition-transform">
-          <p className="text-sm text-gray-500">Gastos</p>
-          <p className="text-xl font-bold">€{totals.expense.toFixed(2)}</p>
-        </Card>
-        <Card className="flex-1 hover:shadow-lg transform hover:scale-105 transition-shadow transition-transform">
-          <p className="text-sm text-gray-500">Saldo</p>
-          <p className="text-xl font-bold">€{(totals.income - totals.expense).toFixed(2)}</p>
-        </Card>
+      <div className="flex items-center justify-between">
+    <h1 className="text-2xl font-semibold">Finanzas</h1>
+    <div className="flex space-x-2">
+      <Button variant="primary" onClick={handleConnectBank}>Conectar con banco</Button>
+      <Button variant="success" onClick={() => setModalOpen(true)}>Añadir movimiento</Button>
+    </div>
+  </div>
+      {/* Balance y métricas */}
+      <div className="mt-4 space-y-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col gap-4 md:w-1/2">
+            <Card className="p-4 text-center">
+              <p className="text-sm text-gray-500">Ingresos Esperados</p>
+              <p className="text-xl font-bold">€{expectedIncome.toFixed(2)}</p>
+            </Card>
+            <Card className="p-4 text-center">
+              <p className="text-sm text-gray-500">Ingresos Realizados</p>
+              <p className="text-xl font-bold">€{totals.income.toFixed(2)}</p>
+            </Card>
+          </div>
+          <div className="flex flex-col gap-4 md:w-1/2">
+            <Card className="p-4 text-center">
+              <p className="text-sm text-gray-500">Aportación Mensual</p>
+              <p className="text-xl font-bold">€{monthlyContrib.toFixed(2)}</p>
+            </Card>
+            <Card className="p-4 text-center">
+              <p className="text-sm text-gray-500">Próximos Gastos</p>
+              <p className="text-xl font-bold">€{outstandingTotal.toFixed(2)}</p>
+            </Card>
+          </div>
+        </div>
+        <Button variant="secondary" className="w-full text-4xl py-4 mt-4">Saldo: €{(totals.income - totals.expense).toFixed(2)}</Button>
+        {/* Tabla de movimientos */}
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-2">Movimientos</h2>
+          <table className="w-full table-auto">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-2">Concepto</th>
+                <th className="p-2">Importe</th>
+                <th className="p-2">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map(t => (
+                <tr key={t.id} className="border-b odd:bg-gray-50">
+                  <td className="p-2">{t.item}</td>
+                  <td className="p-2">{currencyFormatter.format(t.realCost)}</td>
+                  <td className="p-2">{t.paymentDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Próximos pagos */}
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-2">Próximos Pagos</h2>
+          <table className="w-full table-auto">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-2">Concepto</th>
+                <th className="p-2">Importe</th>
+                <th className="p-2">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.filter(t => t.status !== 'paid').map(t => (
+                <tr key={t.id} className="border-b odd:bg-gray-50">
+                  <td className="p-2">{t.item}</td>
+                  <td className="p-2">{currencyFormatter.format(t.estimatedCost)}</td>
+                  <td className="p-2">{t.paymentDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+      {/* Resumen de Cuenta Conjunta */}
+
 
       {/* Dashboard de Análisis */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="hidden">
         <div className="bg-white p-4 rounded shadow">
           <h2 className="text-lg font-semibold mb-2">Evolución Mensual</h2>
           <ResponsiveContainer width="100%" height={200}>
@@ -217,59 +294,35 @@ const paginatedTransactions = sortedTransactions.slice((currentPage - 1) * pageS
         </div>
       </div>
       {/* Filtros y Tabla */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">Contribución mensual</p>
-          <input type="number" value={monthlyContrib} onChange={e => setMonthlyContrib(e.target.value)} className="w-full mt-1 border rounded px-2 py-1" />
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">Ingresos esperados</p>
-          <input type="number" value={expectedIncome} onChange={e => setExpectedIncome(e.target.value)} className="w-full mt-1 border rounded px-2 py-1" />
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">Monto pagado</p>
-          <p className="text-xl font-bold">€{paidTotal.toFixed(2)}</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">Pendiente</p>
-          <p className="text-xl font-bold">€{outstandingTotal.toFixed(2)}</p>
+      
+
+        <div className="overflow-auto">
+          <table className="w-full table-auto" aria-label="Tabla completa de transacciones">
+
+            <tbody>
+              {transactions.map(t => (
+                <tr key={t.id} className="border-b odd:bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <td className="p-2">{t.item}</td>
+                  <td className="p-2">{t.category}</td>
+                  <td className="p-2">{t.provider}</td>
+                  <td className="p-2">{currencyFormatter.format(t.estimatedCost)}</td>
+                  <td className="p-2">{currencyFormatter.format(t.realCost)}</td>
+                  <td className="p-2">{t.paymentDate}</td>
+                  <td className="p-2">{t.status}</td>
+                  <td className="p-2">{t.type}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-      <Card className="space-y-4">
-        <div className="flex flex-wrap gap-2 mb-4">
-          <select aria-label="Filtrar por categoría" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="border rounded px-2 py-1 w-full">
-            <option value="">Todas las categorías</option>
-            {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-          <select aria-label="Filtrar por proveedor" value={providerFilter} onChange={e => setProviderFilter(e.target.value)} className="border rounded px-2 py-1 w-full">
-            <option value="">Todos los proveedores</option>
-            {providersList.map(prov => <option key={prov} value={prov}>{prov}</option>)}
-          </select>
-          <select aria-label="Filtrar por estado" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border rounded px-2 py-1">
-            <option value="">Todos los estados</option>
-            <option value="pending">Pendiente</option>
-            <option value="paid">Pagado</option>
-          </select>
-          <input type="date" aria-label="Fecha desde" value={fromDate} onChange={e => setFromDate(e.target.value)} className="border rounded px-2 py-1" />
-          <input type="date" aria-label="Fecha hasta" value={toDate} onChange={e => setToDate(e.target.value)} className="border rounded px-2 py-1" />
-          <Button className="px-4 py-1 transform hover:scale-105 transition-transform">Filtrar</Button>
-          <Button variant="secondary" className="px-4 py-1 transform hover:scale-105 transition-transform">Limpiar</Button>
-        </div>
+      
+
         {loading && <Spinner />}
 {error && <div role="alert" className="text-red-600 mb-4">{error}</div>}
 <div className="overflow-auto relative">
           <table className="w-full table-auto" aria-label="Tabla de transacciones">
-            <thead className="bg-gray-100 sticky top-0 z-10">
-              <tr className="text-left border-b">
-                <th scope="col" className="p-2 cursor-pointer select-none" onClick={() => handleSort('item')}>Ítem {sortConfig.key === 'item' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}</th>
-                <th scope="col" className="p-2 cursor-pointer select-none" onClick={() => handleSort('category')}>Categoría {sortConfig.key === 'category' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}</th>
-                <th scope="col" className="p-2 cursor-pointer select-none" onClick={() => handleSort('provider')}>Proveedor {sortConfig.key === 'provider' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}</th>
-                <th scope="col" className="p-2 cursor-pointer select-none" onClick={() => handleSort('estimatedCost')}>Coste Previsto {sortConfig.key === 'estimatedCost' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}</th>
-                <th scope="col" className="p-2 cursor-pointer select-none" onClick={() => handleSort('realCost')}>Coste Real {sortConfig.key === 'realCost' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}</th>
-                <th scope="col" className="p-2 cursor-pointer select-none" onClick={() => handleSort('paymentDate')}>Fecha de Pago {sortConfig.key === 'paymentDate' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}</th>
-                <th scope="col" className="p-2 cursor-pointer select-none" onClick={() => handleSort('status')}>Estado {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}</th>
-              </tr>
-            </thead>
+
             <tbody>
               {paginatedTransactions.map(t => (
                 <tr key={t.id} className="border-b odd:bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -289,16 +342,13 @@ const paginatedTransactions = sortedTransactions.slice((currentPage - 1) * pageS
                 <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={page => setCurrentPage(page)} />
               </div>
         </div>
-      </Card>
-
       {/* Botones de acción */}
       <Button className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg z-50" onClick={() => setModalOpen(true)} aria-label="Agregar transacción">
         <Plus className="text-white" />
       </Button>
-      <div className="flex gap-2">
-        <Button variant="success" onClick={exportCsv} className="transform hover:scale-105 transition-transform">Exportar CSV</Button>
-        <Button variant="danger" className="transform hover:scale-105 transition-transform">Exportar PDF</Button>
-      </div>
+      
+
+
 
       {/* Modal */}
       {modalOpen && (
@@ -333,6 +383,6 @@ const paginatedTransactions = sortedTransactions.slice((currentPage - 1) * pageS
           </Card>
         </div>
       )}
-    </div>
-  );
+  
+  </>);
 }

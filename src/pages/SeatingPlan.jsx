@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, Cpu } from 'lucide-react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -24,12 +24,123 @@ export default function SeatingPlan() {
     { id: 2, name: 'Luis Martínez' },
   ];
 
+  // Drawing and seating state
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [strokePoints, setStrokePoints] = useState([]);
+  const [rows, setRows] = useState(5);
+  const [cols, setCols] = useState(5);
+  const [seats, setSeats] = useState([]);
+  const [shapePoints, setShapePoints] = useState([]);
+  const [shapeFinalized, setShapeFinalized] = useState(false);
+
+  // Util: point-in-polygon test
+  const isPointInPolygon = (point, vs) => {
+    let x = point.x, y = point.y;
+    let inside = false;
+    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+      let xi = vs[i].x, yi = vs[i].y;
+      let xj = vs[j].x, yj = vs[j].y;
+      let intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  };
+  const relatives = guests; // TODO: replace with actual closest relatives list
+
+  // Generate and filter seats after area finalize
+  useEffect(() => {
+    if (!shapeFinalized) {
+      setSeats([]);
+      return;
+    }
+    const containerWidth = 600;
+    const containerHeight = 500;
+    const seatSize = 40;
+    const hSpacing = cols > 1 ? (containerWidth - seatSize) / (cols - 1) : 0;
+    const vSpacing = rows > 1 ? (containerHeight - seatSize) / (rows - 1) : 0;
+    const newSeats = [];
+    let id = 1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = c * hSpacing;
+        const y = r * vSpacing;
+        const center = { x: x + seatSize / 2, y: y + seatSize / 2 };
+        if (isPointInPolygon(center, shapePoints)) {
+          newSeats.push({ id, row: r + 1, col: c + 1, x, y, assignedGuest: null });
+          id++;
+        }
+      }
+    }
+    // Auto-assign relatives
+    newSeats.forEach((seat, idx) => {
+      if (relatives[idx]) seat.assignedGuest = relatives[idx].id;
+    });
+    setSeats(newSeats);
+  }, [shapeFinalized, shapePoints, rows, cols, relatives]);
+
+  // Draw strokes or finalized shape on canvas
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    const pts = shapeFinalized ? shapePoints : strokePoints;
+    if (pts.length === 0) return;
+    if (shapeFinalized) {
+      ctx.beginPath();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      let prev = pts[0];
+      for (let i = 1; i < pts.length; i++) {
+        const cpX = (prev.x + pts[i].x) / 2;
+        const cpY = (prev.y + pts[i].y) / 2;
+        ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
+        prev = pts[i];
+      }
+      // close to first
+      const cpX = (prev.x + pts[0].x) / 2;
+      const cpY = (prev.y + pts[0].y) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
+    } else {
+      ctx.beginPath();
+      pts.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+    }
+    ctx.strokeStyle = 'blue';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }, [strokePoints, shapePoints, shapeFinalized]);
+
+  const handleCanvasMouseDown = e => {
+    setIsDrawing(true);
+    const rect = canvasRef.current.getBoundingClientRect();
+    setStrokePoints([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+  };
+
+  const handleCanvasMouseMove = e => {
+    if (!isDrawing) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    setStrokePoints(prev => [...prev, { x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+  };
+
+  const handleCanvasMouseUp = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    // Finalizar trazado y guardar puntos
+    setShapePoints(strokePoints);
+    setShapeFinalized(true);
+  };
+
   const filteredGuests = guests.filter(g =>
     g.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (  
-      {/* Tabs for ceremony/banquet */}
+  return (
+  <>  
+
       <div className="flex space-x-2 mb-4">
         <button onClick={() => setActiveTab('ceremony')} className={`px-4 py-2 rounded ${activeTab==='ceremony'?'bg-blue-600 text-white':'bg-gray-200'}`}>
           Ceremonia
@@ -70,18 +181,98 @@ export default function SeatingPlan() {
           {/* Plano interactivo */}
           <div
             className="relative flex-1 border rounded p-4"
-            style={{ height: '500px' }}
+            style={{ height: '500px', position: 'relative' }}
           >
-            {tables.map(table => (
-              <div
-                key={table.id}
-                className={`absolute p-2 flex flex-col items-center justify-center ${table.shape === 'circle' ? 'rounded-full' : 'rounded'} bg-gray-200`}
-                style={{ left: table.x, top: table.y, width: 80, height: 80 }}
-              >
-                <p className="text-sm font-semibold">{table.name}</p>
-                <p className="text-xs">{table.capacity} pax</p>
-              </div>
-            ))}
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={500}
+              className="absolute top-0 left-0 w-full h-full z-0"
+              onMouseDown={!shapeFinalized ? handleCanvasMouseDown : undefined}
+              onMouseMove={!shapeFinalized ? handleCanvasMouseMove : undefined}
+              onMouseUp={!shapeFinalized ? handleCanvasMouseUp : undefined}
+            />
+            {activeTab === 'ceremony' ? (
+              <>
+                {/* Drawing phase */}
+                {!shapeFinalized && (
+                  <>
+                    <button
+                      onClick={() => setIsDrawing(!isDrawing)}
+                      className={`px-2 py-1 rounded ${isDrawing ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}
+                    >
+                      {isDrawing ? 'Detener dibujo' : 'Iniciar dibujo'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsDrawing(false);
+                        setShapePoints(strokePoints);
+                        setShapeFinalized(true);
+                      }}
+                      className="px-2 py-1 ml-2 bg-green-600 text-white rounded"
+                    >
+                      Finalizar área
+                    </button>
+
+                  </>
+                )}
+                {/* Seat placement phase */}
+                {shapeFinalized && (
+                  <>
+                    <div className="flex gap-2 mb-2">
+                      <label className="flex items-center">
+                        Filas:
+                        <input
+                          type="number"
+                          min="1"
+                          value={rows}
+                          onChange={e => setRows(parseInt(e.target.value) || 1)}
+                          className="ml-1 w-16 border rounded px-2 py-1"
+                        />
+                      </label>
+                      <label className="flex items-center">
+                        Columnas:
+                        <input
+                          type="number"
+                          min="1"
+                          value={cols}
+                          onChange={e => setCols(parseInt(e.target.value) || 1)}
+                          className="ml-1 w-16 border rounded px-2 py-1"
+                        />
+                      </label>
+                    </div>
+                    {seats.map(seat => (
+                      <div
+                        key={seat.id}
+                        className="absolute z-10 flex items-center justify-center border bg-white"
+                        style={{ left: seat.x, top: seat.y, width: 40, height: 40 }}
+                      >
+                        <span className="text-xs">{seat.row}-{seat.col}</span>
+                        {seat.assignedGuest && (
+                          <span
+                            className="text-red-600 absolute bottom-0 right-0 text-xs cursor-pointer"
+                            onClick={() => alert('Editar asiento ' + seat.id)}
+                          >
+                            ✏️
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </>
+            ) : (
+              tables.map(table => (
+                <div
+                  key={table.id}
+                  className={`absolute p-2 flex flex-col items-center justify-center ${table.shape === 'circle' ? 'rounded-full' : 'rounded'} bg-gray-200`}
+                  style={{ left: table.x, top: table.y, width: 80, height: 80 }}
+                >
+                  <p className="text-sm font-semibold">{table.name}</p>
+                  <p className="text-xs">{table.capacity} pax</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </DndProvider>
@@ -101,5 +292,6 @@ export default function SeatingPlan() {
         <button className="bg-gray-200 px-4 py-1 rounded">Exportar PDF</button>
       </div>
     </div>
+  </>
   );
 }

@@ -14,7 +14,7 @@ export default function Nav() {
   const navigate = useNavigate();
   const location = useLocation();
   return (
-    <nav className='fixed bottom-0 w-full bg-pastel-blue text-gray-800 shadow-md flex justify-around p-3'>
+    <nav className='fixed bottom-0 w-full bg-pastel-blue bg-opacity-100 text-gray-800 shadow-md flex justify-around p-3 z-50'>
       {navItems.map(({ path, label }, idx) => {
         const isActive = location.pathname.startsWith(path);
         return (
