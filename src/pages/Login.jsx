@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { useUserContext } from '../context/UserContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [remember, setRemember] = useState(true);
   const { login } = useUserContext();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (username === 'admin' && password === 'admin123') {
-      login(username);
+    setError('');
+    try {
+      await login(username, password, remember);
       navigate('/home');
-    } else {
+    } catch (err) {
       setError('Usuario o contraseña inválidos');
     }
   };
@@ -38,12 +40,23 @@ export default function Login() {
           className="border p-2 w-full mb-4"
         />
         {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-        <button
+        <div className="flex items-center mb-4">
+            <input
+              type="checkbox"
+              id="remember"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="mr-2"
+            />
+            <label htmlFor="remember" className="text-sm">Recuérdame</label>
+          </div>
+          <button
           type="submit"
           className="bg-pastel-blue text-white px-4 py-2 rounded w-full hover:bg-pastel-green transition-colors"
         >
           Entrar
         </button>
+        <p className="mt-4 text-sm">¿No tienes cuenta? <Link to="/signup" className="text-pastel-blue hover:underline">Regístrate</Link></p>
       </form>
     </div>
   );

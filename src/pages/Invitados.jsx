@@ -26,6 +26,14 @@ const sendBulkEmails = () => {
   }
 };
   const [showModal, setShowModal] = useState(false);
+const initialGuest = { name: '', email: '', phone: '', rsvp: 'Pendiente', guests: 1, table: '' };
+const [newGuest, setNewGuest] = useState(initialGuest);
+const handleSaveGuest = () => {
+  const newId = guests.length ? Math.max(...guests.map(g => g.id)) + 1 : 1;
+  setGuests(prev => [...prev, { ...newGuest, id: newId }]);
+  setNewGuest(initialGuest);
+  setShowModal(false);
+};
 
   const filtered = guests.filter(g => {
     return (
@@ -162,8 +170,60 @@ const sendBulkEmails = () => {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-4 rounded shadow w-96">
             <h2 className="text-lg font-semibold mb-4">Añadir Invitado</h2>
-            {/* Campos de formulario */}
-            <button onClick={() => setShowModal(false)} className="mt-4 px-4 py-2 bg-red-600 text-white rounded">Cerrar</button>
+            {/* Formulario Añadir Invitado */}
+            <form onSubmit={e => { e.preventDefault(); handleSaveGuest(); }} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Nombre completo"
+                value={newGuest.name}
+                onChange={e => setNewGuest({ ...newGuest, name: e.target.value })}
+                className="w-full border rounded px-2 py-1"
+                required
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={newGuest.email}
+                onChange={e => setNewGuest({ ...newGuest, email: e.target.value })}
+                className="w-full border rounded px-2 py-1"
+                required
+              />
+              <input
+                type="tel"
+                placeholder="Teléfono"
+                value={newGuest.phone}
+                onChange={e => setNewGuest({ ...newGuest, phone: e.target.value })}
+                className="w-full border rounded px-2 py-1"
+              />
+              <select
+                value={newGuest.rsvp}
+                onChange={e => setNewGuest({ ...newGuest, rsvp: e.target.value })}
+                className="w-full border rounded px-2 py-1"
+              >
+                <option value="Pendiente">Pendiente</option>
+                <option value="Sí">Sí</option>
+                <option value="No">No</option>
+              </select>
+              <input
+                type="number"
+                min="1"
+                placeholder="Acompañantes"
+                value={newGuest.guests}
+                onChange={e => setNewGuest({ ...newGuest, guests: parseInt(e.target.value, 10) || 0 })}
+                className="w-full border rounded px-2 py-1"
+              />
+              <input
+                type="text"
+                placeholder="Mesa"
+                value={newGuest.table}
+                onChange={e => setNewGuest({ ...newGuest, table: e.target.value })}
+                className="w-full border rounded px-2 py-1"
+              />
+              <div className="flex justify-end space-x-2 mt-2">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-300 rounded">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Guardar</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

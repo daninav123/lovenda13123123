@@ -1,5 +1,5 @@
 export default {
-  darkMode: 'class',
+  darkMode: false,
   content: ['./index.html', './src/**/*.{js,jsx}'],
   // Using class strategy for dark mode
   theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] }, colors: {

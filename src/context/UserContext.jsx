@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth } from '../firebaseConfig';
+import { setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -27,6 +28,12 @@ export default function UserProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Bypass login in development phase
+    if (process.env.NODE_ENV === 'development') {
+      setUser({ uid: 'dev', email: 'dev@local', role: 'particular' });
+      setLoading(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
@@ -48,8 +55,9 @@ export default function UserProvider({ children }) {
     return newUser;
   };
 
-  const login = async (email, password) => {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  const login = async (email, password, remember = true) => {
+    await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
     setUser(userCredential.user);
     return userCredential.user;
   };
@@ -66,9 +74,53 @@ export default function UserProvider({ children }) {
     }
   };
 
+  const sendVerificationEmail = async () => {
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser);
+    }
+  };
+
+  const sendPasswordReset = async (email) => {
+    if (email) {
+      await sendPasswordResetEmail(auth, email);
+    }
+  };
+
+  const updateUserEmail = async (newEmail) => {
+    if (auth.currentUser) {
+      await updateEmail(auth.currentUser, newEmail);
+      setUser({ ...auth.currentUser, email: newEmail });
+    }
+  };
+
+  const updateUserPassword = async (newPassword) => {
+    if (auth.currentUser) {
+      await updatePassword(auth.currentUser, newPassword);
+    }
+  };
+
+  const reauthenticate = async (credential) => {
+    if (auth.currentUser) {
+      await reauthenticateWithCredential(auth.currentUser, credential);
+    }
+  };
+
   return (
-    <UserContext.Provider value={{ user, isAuthenticated: !!user, loading, signup, login, logout, updateProfile }}>
-      {!loading && children}
+    <UserContext.Provider value={{
+      user,
+      isAuthenticated: !!user,
+      loading,
+      signup,
+      login,
+      logout,
+      updateProfile,
+      sendVerificationEmail,
+      sendPasswordReset,
+      updateUserEmail,
+      updateUserPassword,
+      reauthenticate,
+    }}>
+      {children}
     </UserContext.Provider>
   );
 }

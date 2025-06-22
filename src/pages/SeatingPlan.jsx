@@ -6,12 +6,19 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 export default function SeatingPlan() {
   const [searchTerm, setSearchTerm] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
-
-  // Sample data (replace with real data)
-  const tables = [
-    { id: 1, name: 'Mesa 1', capacity: 8, x: 50, y: 50, shape: 'circle' },
-    { id: 2, name: 'Mesa 2', capacity: 6, x: 200, y: 100, shape: 'rect' },
+  // Tab state for seating plan
+  const [activeTab, setActiveTab] = useState('ceremony');
+  // Tables for ceremony and banquet
+  const ceremonyTables = [
+    { id: 1, name: 'Mesa Ceremonia 1', capacity: 8, x: 50, y: 50, shape: 'circle' },
+    { id: 2, name: 'Mesa Ceremonia 2', capacity: 6, x: 200, y: 100, shape: 'rect' },
   ];
+  const banquetTables = [
+    { id: 3, name: 'Mesa Banquete 1', capacity: 10, x: 100, y: 50, shape: 'circle' },
+    { id: 4, name: 'Mesa Banquete 2', capacity: 8, x: 250, y: 120, shape: 'rect' },
+  ];
+  const tables = activeTab === 'ceremony' ? ceremonyTables : banquetTables;
+  // Sample guests (replace with real data)
   const guests = [
     { id: 1, name: 'Ana García' },
     { id: 2, name: 'Luis Martínez' },
@@ -21,7 +28,17 @@ export default function SeatingPlan() {
     g.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
+  return (  
+      {/* Tabs for ceremony/banquet */}
+      <div className="flex space-x-2 mb-4">
+        <button onClick={() => setActiveTab('ceremony')} className={`px-4 py-2 rounded ${activeTab==='ceremony'?'bg-blue-600 text-white':'bg-gray-200'}`}>
+          Ceremonia
+        </button>
+        <button onClick={() => setActiveTab('banquet')} className={`px-4 py-2 rounded ${activeTab==='banquet'?'bg-blue-600 text-white':'bg-gray-200'}`}>
+          Banquete
+        </button>
+      </div>
+      <h1 className="text-2xl font-semibold">Seating Plan - {activeTab==='ceremony'?'Ceremonia':'Banquete'}</h1>
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Seating Plan</h1>
       <DndProvider backend={HTML5Backend}>

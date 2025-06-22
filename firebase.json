@@ -1,0 +1,13 @@
+{
+  "emulators": {
+    "hub": {
+      "port": 4403
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
+}

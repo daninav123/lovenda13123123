@@ -104,7 +104,7 @@ const meetings = [
 export default function Tasks() {
   const [currentView, setCurrentView] = useState('month');
   const ganttRef = useRef(null);
-  const listCellWidth = 100;
+  const listCellWidth = 40; // restored minimal list column width to maintain grid alignment // hide name column entirely
   const [columnWidthState, setColumnWidthState] = useState(0);
 
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function Tasks() {
     const maxDate = new Date(maxTime);
     const monthsCount = (maxDate.getFullYear() - minDate.getFullYear()) * 12 + (maxDate.getMonth() - minDate.getMonth()) + 1;
     const availableWidth = containerWidth - listCellWidth;
-    const cw = Math.min(Math.floor(availableWidth / monthsCount), 80); // cap column width at 80px to avoid horizontal scroll
+    const cw = Math.min(Math.floor(availableWidth / monthsCount), 50); // cap column width at 50px to avoid horizontal scroll // cap column width at 60px to further avoid horizontal scroll // cap column width at 80px to avoid horizontal scroll // cap column width at 80px to avoid horizontal scroll
     setColumnWidthState(cw);
   }, [tasks]);
   const allEvents = [ ...meetings, ...tasks.map(task => ({ id: task.id, title: task.name, start: task.start, end: task.end, type: 'task', desc: `Progreso: ${task.progress}%`, category: task.category })) ];
@@ -151,14 +151,20 @@ export default function Tasks() {
       `}</style>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de Tareas y Eventos</h1>
-        <button onClick={() => downloadAllICS(allEvents)} className="bg-blue-600 text-white px-3 py-1 rounded">
-          Exportar calendario (.ics)
-        </button>
+        <details className="relative inline-block">
+          <summary className="bg-blue-600 text-white px-3 py-1 rounded cursor-pointer">Sincronizar calendario</summary>
+          <div className="absolute left-0 mt-2 bg-white border rounded shadow p-2 space-y-1">
+            <button onClick={() => downloadAllICS(allEvents)} className="w-full text-left text-gray-800 hover:bg-gray-100 p-1">Exportar .ics</button>
+            <button onClick={() => window.open('/calendar.ics','_blank')} className="w-full text-left text-gray-800 hover:bg-gray-100 p-1">Suscribirse iCal</button>
+            <a href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(window.location.origin + '/calendar.ics')}`} target="_blank" rel="noopener" className="w-full block text-left text-gray-800 hover:bg-gray-100 p-1">Google Calendar</a>
+            <a href={`https://outlook.live.com/owa/?path=/calendar/view&rru=addsubscription&url=${encodeURIComponent(window.location.origin + '/calendar.ics')}`} target="_blank" rel="noopener" className="w-full block text-left text-gray-800 hover:bg-gray-100 p-1">Outlook Calendar</a>
+          </div>
+        </details>
       </div>
 
       <div className="bg-white rounded-xl shadow-md p-6">
         <h2 className="text-xl font-semibold mb-4">Vista del Proyecto</h2>
-        <div ref={ganttRef} className="w-full overflow-hidden">
+        <div ref={ganttRef} className="w-full overflow-x-hidden" style={{ marginLeft: -listCellWidth, paddingLeft: listCellWidth }}>
           <Gantt tasks={tasks} viewMode={ViewMode.Month} listCellWidth={listCellWidth} columnWidth={columnWidthState} locale="es" barFill={60} barCornerRadius={4} barProgressColor="#4f46e5" barProgressSelectedColor="#4338ca" barBackgroundColor="#a5b4fc" barBackgroundSelectedColor="#818cf8" todayColor="rgba(252,165,165,0.2)" />
         </div>
       </div>
