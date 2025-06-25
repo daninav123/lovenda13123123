@@ -17,6 +17,7 @@ import Perfil from './pages/Perfil';
 import SeatingPlan from './pages/SeatingPlan';
 import Invitaciones from './pages/Invitaciones';
 import Contratos from './pages/Contratos';
+
 import ProtocoloLayout from './pages/protocolo/ProtocoloLayout';
 import MomentosEspeciales from './pages/protocolo/MomentosEspeciales';
 import Timing from './pages/protocolo/Timing';
@@ -24,6 +25,7 @@ import Checklist from './pages/protocolo/Checklist';
 import AyudaCeremonia from './pages/protocolo/AyudaCeremonia';
 import DisenoWeb from './pages/DisenoWeb';
 import Ideas from './pages/Ideas';
+import Buzon from './pages/Buzon';
 
 function ProtectedRoute() {
   const { isAuthenticated } = useUserContext();
@@ -60,6 +62,7 @@ function App() {
               <Route path="invitados/invitaciones" element={<Invitaciones />} />
               <Route path="proveedores" element={<Proveedores />} />
               <Route path="proveedores/contratos" element={<Contratos />} />
+
               {/* Rutas de Protocolo */}
               <Route path="protocolo" element={<ProtocoloLayout />}>
                 <Route index element={<Navigate to="momentos-especiales" replace />} />
@@ -69,6 +72,7 @@ function App() {
                 <Route path="ayuda-ceremonia" element={<AyudaCeremonia />} />
               </Route>
               <Route path="perfil" element={<Perfil />} />
+                <Route path="buzon" element={<Buzon />} />
                <Route path="diseno-web" element={<DisenoWeb />} />
                <Route path="ideas" element={<Ideas />} />
               <Route path="more" element={<More />}>

@@ -159,7 +159,7 @@ export default function Finance() {
     { name: 'Ingresos', value: totals.income },
   ];
 
-  const projectedData = React.useMemo(() => {
+  const projectedData = useMemo(() => {
     let balance = totals.income - totals.expense;
     return data.map(item => {
       balance += monthlyContrib + expectedIncome / data.length - item.expense + item.income;
@@ -167,25 +167,25 @@ export default function Finance() {
     });
   }, [data, totals, monthlyContrib, expectedIncome]);
 
-  const categoriesList = React.useMemo(
+  const categoriesList = useMemo(
     () => Array.from(new Set(transactions.map(t => t.category))).sort(),
     [transactions]
   );
 
-  const providersList = React.useMemo(
+  const providersList = useMemo(
     () => Array.from(new Set(transactions.map(t => t.provider))).sort(),
     [transactions]
   );
 
-  const budgetLimits = useMemo(() => ({
+  const budgetLimits = {
     'Catering': 5000,
-    'Localización': 3000,
+    'Localizacion': 3000,
     'Vestuario': 2000,
-    'Decoración': 1500,
-    'Fotografía': 2500,
-    'Música': 1000,
+    'Decoracion': 1500,
+    'Fotografia': 2500,
+    'Musica': 1000,
     'Otros': 1000
-  }), []);
+  };
 
   if (loading) {
     return (
@@ -196,7 +196,7 @@ export default function Finance() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="bg-white rounded-lg shadow p-6 space-y-6">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
       {/* Encabezado */}

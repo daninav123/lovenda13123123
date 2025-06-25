@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Mail, Edit2, Trash2, RefreshCcw, Plus, User } from 'lucide-react';
+import Card from '../components/Card';
 
 export default function Invitados() {
   const sampleGuests = [

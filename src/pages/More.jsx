@@ -40,7 +40,8 @@ export default function More() {
         {openMenu==='proveedores' && (
           <div className="absolute bg-white border border-gray-200 rounded shadow mt-2 w-full z-10">
             <Link to="/proveedores" className="block px-4 py-2 hover:bg-gray-100">Gestión de proveedores</Link>
-            <Link to="/proveedores/contratos" className="block px-4 py-2 hover:bg-gray-100">Contratos</Link>
+              <Link to="/proveedores/contratos" className="block px-4 py-2 hover:bg-gray-100">Contratos</Link>
+            
           </div>
         )}
       </div>

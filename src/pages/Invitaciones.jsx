@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Eye, Download, Save, Copy, Zap } from 'lucide-react';
 import Spinner from '../components/Spinner';
 import Toast from '../components/Toast';
+import Card from '../components/Card';
 
 export default function Invitaciones() {
   const [aiPrompt, setAiPrompt] = useState(() => localStorage.getItem('invitationAiPrompt') || '');
@@ -80,7 +81,8 @@ export default function Invitaciones() {
   }, [aiPrompt, panel, filterCategory, filterColor, filterFont, step, generatedText, showPreview]);
 
   return (
-    <div className="p-6 space-y-6">
+    <Card className="p-6 space-y-6">
+
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}  
       <h1 className="text-2xl font-semibold">Diseño de Invitaciones</h1>
       <div className="flex justify-between mb-4">  
@@ -204,6 +206,6 @@ export default function Invitaciones() {
         </section>
       )}
 
-    </div>
+    </Card>
   );
 }

@@ -18,6 +18,7 @@ export default function MainLayout() {
           {openMenu && (
             <div className="absolute right-0 mt-2 bg-white border rounded shadow p-2 space-y-1">
               <Link to="/perfil" className="block px-2 py-1 hover:bg-gray-100">Perfil</Link>
+<Link to="/buzon" className="block px-2 py-1 hover:bg-gray-100">Buzón</Link>
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Spinner from '../components/Spinner';
 import Toast from '../components/Toast';
+import Card from '../components/Card';
 import { Search, RefreshCcw, Plus, Eye, Edit2, Trash2, Calendar, Download, Cpu, Star } from 'lucide-react';
 
 export default function Proveedores() {
@@ -26,6 +27,16 @@ export default function Proveedores() {
   const [providerToReserve, setProviderToReserve] = useState(null);
   const [resDate, setResDate] = useState('');
   const [resTime, setResTime] = useState('');
+  const initialProvider = { name: '', service: '', contact: '', email: '', phone: '', status: '', date: '' };
+  const [newProvider, setNewProvider] = useState(initialProvider);
+  const handleAddProvider = e => {
+    e.preventDefault();
+    const newId = providers.length ? Math.max(...providers.map(p => p.id)) + 1 : 1;
+    setProviders(prev => [...prev, { id: newId, ...newProvider, rating: 0, ratingCount: 0 }]);
+    setNewProvider(initialProvider);
+    setShowAddModal(false);
+    setToast({ message: 'Proveedor agregado', type: 'success' });
+  };
 
   const openResModal = (p) => {
     setProviderToReserve(p);
@@ -101,7 +112,7 @@ export default function Proveedores() {
   const openDetail = p => { setDetailProvider(p); setShowDetail(true); };
 
   return (
-    <div className="p-6 space-y-6">
+    <Card className="p-6 space-y-6">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -207,9 +218,9 @@ export default function Proveedores() {
                   <span className="text-sm text-gray-600 ml-1">({p.ratingCount})</span>
                 </td>
                 <td className="p-2 flex gap-2">
-                  <Eye size={16} className="cursor-pointer text-gray-600" />
+                  <Eye size={16} className="cursor-pointer text-gray-600" onClick={() => openDetail(p)} />
                   <Edit2 size={16} className="cursor-pointer text-blue-600" />
-                  <Trash2 size={16} className="cursor-pointer text-red-600" />
+                  <Trash2 size={16} className="cursor-pointer text-red-600" onClick={() => { setProviders(prev => prev.filter(x => x.id !== p.id)); setToast({ message: 'Proveedor eliminado', type: 'success' }); }} />
                   <Calendar size={16} className="cursor-pointer text-green-600" onClick={() => openResModal(p)} />
                   <span className="text-sm text-gray-600 ml-1">{reservations.filter(r => r.providerId === p.id).length}</span>
                   <Download size={16} className="cursor-pointer text-purple-600" />
@@ -241,12 +252,58 @@ export default function Proveedores() {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-4 rounded shadow w-96">
             <h2 className="text-lg font-semibold mb-4">Añadir Proveedor</h2>
-            {/* TODO: Formulario de alta */}
-            <button onClick={() => setShowAddModal(false)} className="mt-4 px-4 py-2 bg-red-600 text-white rounded">Cerrar</button>
+            <form onSubmit={handleAddProvider} className="space-y-3">
+              <input type="text" placeholder="Nombre" value={newProvider.name} onChange={e => setNewProvider({ ...newProvider, name: e.target.value })} className="w-full border rounded px-2 py-1" required />
+              <input type="text" placeholder="Servicio" value={newProvider.service} onChange={e => setNewProvider({ ...newProvider, service: e.target.value })} className="w-full border rounded px-2 py-1" required />
+              <input type="text" placeholder="Contacto" value={newProvider.contact} onChange={e => setNewProvider({ ...newProvider, contact: e.target.value })} className="w-full border rounded px-2 py-1" />
+              <input type="email" placeholder="Email" value={newProvider.email} onChange={e => setNewProvider({ ...newProvider, email: e.target.value })} className="w-full border rounded px-2 py-1" />
+              <input type="tel" placeholder="Teléfono" value={newProvider.phone} onChange={e => setNewProvider({ ...newProvider, phone: e.target.value })} className="w-full border rounded px-2 py-1" />
+              <select value={newProvider.status} onChange={e => setNewProvider({ ...newProvider, status: e.target.value })} className="w-full border rounded px-2 py-1">
+                <option value="">Seleccionar estado</option>
+                <option value="Contactado">Contactado</option>
+                <option value="Confirmado">Confirmado</option>
+                <option value="Pendiente">Pendiente</option>
+              </select>
+              <input type="date" value={newProvider.date} onChange={e => setNewProvider({ ...newProvider, date: e.target.value })} className="w-full border rounded px-2 py-1" />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Guardar</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
-    </div>
+      {showDetail && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-4 rounded shadow w-96">
+            <h2 className="text-lg font-semibold mb-4">Detalle del Proveedor</h2>
+            <p><strong>Nombre:</strong> {detailProvider.name}</p>
+            <p><strong>Servicio:</strong> {detailProvider.service}</p>
+            <p><strong>Contacto:</strong> {detailProvider.contact}</p>
+            <p><strong>Email:</strong> {detailProvider.email}</p>
+            <p><strong>Teléfono:</strong> {detailProvider.phone}</p>
+            <p><strong>Estado:</strong> {detailProvider.status}</p>
+            <p><strong>Fecha:</strong> {detailProvider.date}</p>
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setShowDetail(false)} className="px-4 py-2 bg-red-600 text-white rounded">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-4 rounded shadow w-96">
+            <h2 className="text-lg font-semibold mb-4">Reservar con {providerToReserve?.name}</h2>
+            <input type="date" value={resDate} onChange={e => setResDate(e.target.value)} className="w-full border rounded px-2 py-1 mb-2" />
+            <input type="time" value={resTime} onChange={e => setResTime(e.target.value)} className="w-full border rounded px-2 py-1 mb-2" />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowResModal(false)} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+              <button type="button" onClick={confirmReservation} className="px-4 py-2 bg-green-600 text-white rounded">Reservar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card } from '../Card';
+import Card from '../Card';
 import { AlertCircle, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export const VendorPayments = ({ transactions }) => {

@@ -1,363 +1,596 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Cpu } from 'lucide-react';
-import Spinner from '../components/Spinner';
-import Toast from '../components/Toast';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { TouchBackend } from 'react-dnd-touch-backend';
+import { Search, Cpu } from 'lucide-react';
+import Card from '../components/Card';
+import Toast from '../components/Toast';
+import Spinner from '../components/Spinner';
+import { auth, db } from '../firebaseConfig';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { saveAs } from 'file-saver';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
+const ItemTypes = { GUEST: 'guest' };
+
+const isTouchDevice = () => {
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+};
+
+const backend = isTouchDevice() ? TouchBackend : HTML5Backend;
+
+function Guest({ guest, selected, toggleSelect }) {
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: ItemTypes.GUEST,
+    item: { id: guest.id },
+    collect: m => ({ isDragging: m.isDragging() }),
+  }));
+  return (
+    <div ref={drag} style={{ cursor: isDragging ? 'grabbing' : 'grab' }} className={`p-2 mb-2 border rounded bg-white ${isDragging ? 'opacity-50' : ''}`}>
+      <input type="checkbox" checked={selected} onChange={() => toggleSelect(guest.id)} className="mr-2" aria-label={`Seleccionar ${guest.name}`} />{guest.name}
+    </div>
+  );
+}
+
+function Seat({ seat, guest, onDrop, shapeType, seatSize }) {
+  const [{ isOver, canDrop }, drop] = useDrop(() => ({
+    accept: ItemTypes.GUEST,
+    drop: (i) => onDrop(i.id, seat.id),
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
+    }),
+  }));
+
+  // Dynamic background based on drag state
+  let bg = 'bg-gray-100';
+  if (isOver && canDrop) bg = 'bg-green-300';
+  else if (canDrop) bg = 'bg-green-100';
+
+  return (
+    <div 
+      ref={drop}
+      style={{
+        width: seatSize,
+        height: seatSize,
+        borderRadius: shapeType === 'circle' ? '50%' : '0%',
+        transition: 'background-color 0.2s ease, transform 0.2s ease'
+      }}
+      className={`relative m-1 flex items-center justify-center border ${bg}`}
+    >
+      <div className="absolute top-1 left-1 text-xs text-gray-600">{seat.id}</div>
+      <div className="text-sm truncate px-1">{guest ? guest.name : 'Empty'}</div>
+    </div>
+  );
+}
 
 export default function SeatingPlan() {
+  const sampleGuests = [
+    { id: 1, name: 'Ana García', rsvp: 'yes', company: 'AltaCorp' },
+    { id: 2, name: 'Luis Martínez', rsvp: 'no', company: 'Beta Ltd' },
+    { id: 3, name: 'María López', rsvp: 'yes', company: 'Gamma Inc' },
+    { id: 4, name: 'José Fernández', rsvp: 'no', company: 'Delta Co' },
+  ];
+  const [activeTab, setActiveTab] = useState('ceremony');
   const [searchTerm, setSearchTerm] = useState('');
+  const [toast, setToast] = useState(null);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  const [toast, setToast] = useState(null);
-  // Tab state for seating plan
-  const [activeTab, setActiveTab] = useState('ceremony');
-  // Tables for ceremony and banquet
-  const ceremonyTables = [
-    { id: 1, name: 'Mesa Ceremonia 1', capacity: 8, x: 50, y: 50, shape: 'circle' },
-    { id: 2, name: 'Mesa Ceremonia 2', capacity: 6, x: 200, y: 100, shape: 'rect' },
-  ];
-  const banquetTables = [
-    { id: 3, name: 'Mesa Banquete 1', capacity: 10, x: 100, y: 50, shape: 'circle' },
-    { id: 4, name: 'Mesa Banquete 2', capacity: 8, x: 250, y: 120, shape: 'rect' },
-  ];
-  const tables = activeTab === 'ceremony' ? ceremonyTables : banquetTables;
-  // Sample guests (replace with real data)
-  const guests = [
-    { id: 1, name: 'Ana García' },
-    { id: 2, name: 'Luis Martínez' },
-  ];
+  const [previewTasks, setPreviewTasks] = useState(null);
+  const [aiTemp, setAiTemp] = useState(0.7);
+  const [aiMaxTokens, setAiMaxTokens] = useState(150);
+  const containerRef = useRef(null);
+  // Seat style state
+  const [shapeType, setShapeType] = useState('rect');
+  const [seatSize, setSeatSize] = useState(isTouchDevice() ? 40 : 30);
+  // Tool and filter state
+  const [tool, setTool] = useState('draw');
+  const [rsvpFilter, setRsvpFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [selectedGuests, setSelectedGuests] = useState([]);
+  const toggleSelect = id => setSelectedGuests(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const bulkAssign = () => {
+    const seatsArr = activeTab === 'ceremony' ? seatsCeremony : seatsBanquet;
+    const emptySeats = seatsArr.filter(s => !s.assignedGuestId);
+    selectedGuests.forEach((gid, idx) => {
+      const seat = emptySeats[idx];
+      if (seat) assignGuestToSeat(gid, seat.id);
+    });
+    setSelectedGuests([]);
+  };  
+  // Zoom, pan & undo/redo state
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Drawing and seating state
+  // Undo/Redo handlers
+  const undo = () => {
+    if (historyIndex > 0) {
+      const prev = history[historyIndex - 1];
+      setHistoryIndex(historyIndex - 1);
+      setShapePoints(prev);
+      setShapeFinalized(true);
+    }
+  };
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const next = history[historyIndex + 1];
+      setHistoryIndex(historyIndex + 1);
+      setShapePoints(next);
+      setShapeFinalized(true);
+    }
+  };  
+
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokePoints, setStrokePoints] = useState([]);
-  const [rows, setRows] = useState(5);
-  const [cols, setCols] = useState(5);
-  const [seats, setSeats] = useState([]);
   const [shapePoints, setShapePoints] = useState([]);
   const [shapeFinalized, setShapeFinalized] = useState(false);
-
-  // Assign guest to seat on drop
+  // Multiples áreas de asiento
+  const [areas, setAreas] = useState([]);
+  const [rows, setRows] = useState(4);
+  const [cols, setCols] = useState(4);
+  const [seatsCeremony, setSeatsCeremony] = useState([]);
+  const [seatsBanquet, setSeatsBanquet] = useState([]);
+  
+  // assign
   const assignGuestToSeat = (guestId, seatId) => {
-    setSeats(prev => prev.map(s => s.id === seatId ? { ...s, assignedGuest: guestId } : s));
+    const setter = activeTab === 'ceremony' ? setSeatsCeremony : setSeatsBanquet;
+    setter(prev => prev.map(s => s.id === seatId ? { ...s, assignedGuestId: guestId } : s));
+    const g = sampleGuests.find(g => g.id === guestId);
+    setToast({ message: `${g.name} asignado al asiento ${seatId}`, type: 'success' });
   };
 
-    const handleAutoAssign = async () => {
-    if (!aiPrompt) return;
-    setAiLoading(true);
-    setToast(null);
+  // auto-assign
+  const handleAutoAssign = async () => {
+    if (!aiPrompt || !shapeFinalized) return;
+    setAiLoading(true); setToast(null);
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + import.meta.env.VITE_OPENAI_KEY },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: 'Eres un asistente que asigna invitados a asientos basado en criterios del usuario. Devuelve un array JSON de objetos { seatId, guestId }.' },
-            { role: 'user', content: 'Criterios: ' + aiPrompt + '. Invitados: ' + JSON.stringify(guests) + '. Asientos: ' + JSON.stringify(seats.map(s => ({ id: s.id, row: s.row, col: s.col }))) }
-          ]
-        })
+        headers: { 'Content-Type':'application/json', Authorization: 'Bearer '+import.meta.env.VITE_OPENAI_KEY },
+        body: JSON.stringify({ model:'gpt-3.5-turbo', temperature: aiTemp, max_tokens: aiMaxTokens, messages:[
+          {role:'system',content:'Asigna invitados a asientos. Devuelve JSON [{seatId,guestId}]'},
+          {role:'user',content:`Prompt: ${aiPrompt}. Invitados: ${JSON.stringify(sampleGuests)}. Asientos: ${JSON.stringify((activeTab==='ceremony'?seatsCeremony:seatsBanquet))}`} ] })
       });
-      const data = await response.json();
-      let assignments = [];
-      try { assignments = JSON.parse(data.choices[0].message.content); } catch { console.error('Invalid JSON from AI', data.choices[0].message.content); }
-      assignments.forEach(a => assignGuestToSeat(a.guestId, a.seatId));
-      setToast({ message: 'Asignación completada', type: 'success' });
-    } catch (err) {
-      console.error(err);
-      setToast({ message: 'Error en autoasignación', type: 'error' });
-    } finally {
-      setAiLoading(false);
-    }
+      const data = await res.json();
+      let tasks = [];
+      try { tasks = JSON.parse(data.choices[0].message.content); } catch{};
+      setPreviewTasks(tasks);
+      setToast({ message: 'Vista previa lista', type: 'info' });
+    } catch (e) {
+      setToast({ message:'Error autoasignación', type:'error' });
+    } finally { setAiLoading(false); }
   };
 
-  // Util: point-in-polygon test
-  const isPointInPolygon = (point, vs) => {
-    let x = point.x, y = point.y;
-    let inside = false;
-    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-      let xi = vs[i].x, yi = vs[i].y;
-      let xj = vs[j].x, yj = vs[j].y;
-      let intersect = ((yi > y) !== (yj > y)) &&
-        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
+  // point-in-polygon
+  const isPointInPoly = (pt, vs) => {
+    let x=pt.x,y=pt.y, inside=false;
+    for(let i=0,j=vs.length-1;i<vs.length;j=i++){
+      const xi=vs[i].x, yi=vs[i].y, xj=vs[j].x, yj=vs[j].y;
+      const intersect=((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi);
+      if(intersect) inside=!inside;
     }
     return inside;
   };
-  const relatives = guests; // TODO: replace with actual closest relatives list
 
-  // Generate and filter seats after area finalize
-  useEffect(() => {
-    if (!shapeFinalized) {
-      setSeats([]);
-      return;
-    }
-    const containerWidth = 600;
-    const containerHeight = 500;
-    const seatSize = 40;
-    const hSpacing = cols > 1 ? (containerWidth - seatSize) / (cols - 1) : 0;
-    const vSpacing = rows > 1 ? (containerHeight - seatSize) / (rows - 1) : 0;
-    const newSeats = [];
-    let id = 1;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = c * hSpacing;
-        const y = r * vSpacing;
-        const center = { x: x + seatSize / 2, y: y + seatSize / 2 };
-        if (isPointInPolygon(center, shapePoints)) {
-          newSeats.push({ id, row: r + 1, col: c + 1, x, y, assignedGuest: null });
-          id++;
-        }
-      }
-    }
-    // Auto-assign relatives
-    newSeats.forEach((seat, idx) => {
-      if (relatives[idx]) seat.assignedGuest = relatives[idx].id;
-    });
-    setSeats(newSeats);
-  }, [shapeFinalized, shapePoints, rows, cols, relatives]);
-
-  // Draw strokes or finalized shape on canvas
+  // generate seats based on finalized areas
   useEffect(() => {
     if (!canvasRef.current) return;
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    const pts = shapeFinalized ? shapePoints : strokePoints;
-    if (pts.length === 0) return;
-    if (shapeFinalized) {
-      ctx.beginPath();
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      let prev = pts[0];
-      for (let i = 1; i < pts.length; i++) {
-        const cpX = (prev.x + pts[i].x) / 2;
-        const cpY = (prev.y + pts[i].y) / 2;
-        ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
-        prev = pts[i];
+    const w = canvasRef.current.width, h = canvasRef.current.height, size = seatSize;
+    const hsp = cols > 1 ? (w - size) / (cols - 1) : 0;
+    const vsp = rows > 1 ? (h - size) / (rows - 1) : 0;
+    const seatsArr = [];
+    let id = 1;
+    
+    areas.forEach(poly => {
+      // If the grid is 1x1, we cannot use bounding box optimization -> check the single cell
+      if (rows === 1 && cols === 1) {
+        const x = size / 2;
+        const y = size / 2;
+        if (isPointInPoly({ x, y }, poly)) {
+          seatsArr.push({ id: id++, x: 0, y: 0, assignedGuestId: null });
+        }
+        return;
       }
-      // close to first
-      const cpX = (prev.x + pts[0].x) / 2;
-      const cpY = (prev.y + pts[0].y) / 2;
-      ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
-    } else {
-      ctx.beginPath();
-      pts.forEach((pt, i) => {
-        if (i === 0) ctx.moveTo(pt.x, pt.y);
-        else ctx.lineTo(pt.x, pt.y);
+      
+      // If the grid has only one row or one column, we skip the bounding box optimization
+      if (rows === 1 || cols === 1) {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const x = c * hsp + size / 2;
+            const y = r * vsp + size / 2;
+            if (isPointInPoly({ x, y }, poly)) {
+              seatsArr.push({ id: id++, x: r, y: c, assignedGuestId: null });
+            }
+          }
+        }
+        return;
+      }
+      
+      // Compute bounding box of the polygon in canvas coordinates
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      poly.forEach(p => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
       });
-    }
-    ctx.strokeStyle = 'blue';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }, [strokePoints, shapePoints, shapeFinalized]);
-
-  const handleCanvasMouseDown = e => {
-    setIsDrawing(true);
-    const rect = canvasRef.current.getBoundingClientRect();
-    setStrokePoints([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
-  };
-
-  const handleCanvasMouseMove = e => {
-    if (!isDrawing) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    setStrokePoints(prev => [...prev, { x: e.clientX - rect.left, y: e.clientY - rect.top }]);
-  };
-
-  const handleCanvasMouseUp = () => {
-    if (!isDrawing) return;
-    setIsDrawing(false);
-    // Finalizar trazado y guardar puntos
-    setShapePoints(strokePoints);
-    setShapeFinalized(true);
-  };
-
-  const filteredGuests = guests.filter(g =>
-    g.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-  <>  
-
-      <div className="flex space-x-2 mb-4">
-        <button onClick={() => setActiveTab('ceremony')} className={`px-4 py-2 rounded ${activeTab==='ceremony'?'bg-blue-600 text-white':'bg-gray-200'}`}>
-          Ceremonia
-        </button>
-        <button onClick={() => setActiveTab('banquet')} className={`px-4 py-2 rounded ${activeTab==='banquet'?'bg-blue-600 text-white':'bg-gray-200'}`}>
-          Banquete
-        </button>
-      </div>
-      <h1 className="text-2xl font-semibold">Seating Plan - {activeTab==='ceremony'?'Ceremonia':'Banquete'}</h1>
-    <div className="p-6 space-y-6">
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <h1 className="text-2xl font-semibold">Seating Plan</h1>
-      <DndProvider backend={HTML5Backend}>
-        <div className="flex gap-6">
-          {/* Listado de invitados */}
-          <div className="w-1/4 border rounded p-4">
-            <div className="flex items-center border rounded px-2 py-1 mb-2">
-              <Search size={16} className="mr-2 text-gray-600" />
-              <input
-                type="text"
-                placeholder="Buscar invitados"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="outline-none w-full"
-              />
-            </div>
-            <div className="space-y-2 overflow-auto max-h-[400px]">
-              {filteredGuests.map(g => {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: 'GUEST',
-    item: { id: g.id },
-    collect: monitor => ({ isDragging: monitor.isDragging() }),
-  }));
-  return (
-    <div ref={drag} key={g.id} className="border p-2 rounded cursor-move bg-white" style={{ opacity: isDragging ? 0.5 : 1 }}>
-      {g.name}
-    </div>
-  );
-})}
-                <div
-                  key={g.id}
-                  className="border p-2 rounded cursor-move bg-white"
-                >
-                  {g.name}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Plano interactivo */}
-          <div
-            className="relative flex-1 border rounded p-4"
-            style={{ height: '500px', position: 'relative' }}
-          >
-            <canvas
-              ref={canvasRef}
-              width={600}
-              height={500}
-              className="absolute top-0 left-0 w-full h-full z-0"
-              onMouseDown={!shapeFinalized ? handleCanvasMouseDown : undefined}
-              onMouseMove={!shapeFinalized ? handleCanvasMouseMove : undefined}
-              onMouseUp={!shapeFinalized ? handleCanvasMouseUp : undefined}
-            />
-            {activeTab === 'ceremony' ? (
-              <>
-                {/* Drawing phase */}
-                {!shapeFinalized && (
-                  <>
-                    <button
-                      onClick={() => setIsDrawing(!isDrawing)}
-                      className={`px-2 py-1 rounded ${isDrawing ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}
-                    >
-                      {isDrawing ? 'Detener dibujo' : 'Iniciar dibujo'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsDrawing(false);
-                        setShapePoints(strokePoints);
-                        setShapeFinalized(true);
-                      }}
-                      className="px-2 py-1 ml-2 bg-green-600 text-white rounded"
-                    >
-                      Finalizar área
-                    </button>
-
-                  </>
-                )}
-                {/* Seat placement phase */}
-                {shapeFinalized && (
-                  <>
-                    <div className="flex gap-2 mb-2">
-                      <label className="flex items-center">
-                        Filas:
-                        <input
-                          type="number"
-                          min="1"
-                          value={rows}
-                          onChange={e => setRows(parseInt(e.target.value) || 1)}
-                          className="ml-1 w-16 border rounded px-2 py-1"
-                        />
-                      </label>
-                      <label className="flex items-center">
-                        Columnas:
-                        <input
-                          type="number"
-                          min="1"
-                          value={cols}
-                          onChange={e => setCols(parseInt(e.target.value) || 1)}
-                          className="ml-1 w-16 border rounded px-2 py-1"
-                        />
-                      </label>
-                    </div>
-                    {seats.map(seat => {
-  const [{ isOver, canDrop }, drop] = useDrop(() => ({
-    accept: 'GUEST',
-    drop: item => assignGuestToSeat(item.id, seat.id),
-    collect: monitor => ({ isOver: monitor.isOver(), canDrop: monitor.canDrop() }),
-  }));
-  const bg = isOver && canDrop ? '#e0f7fa' : 'white';
-  return (
-    <div ref={drop} key={seat.id} className="absolute z-10 flex items-center justify-center border" style={{ left: seat.x, top: seat.y, width: 40, height: 40, backgroundColor: bg }}>
-      {seat.assignedGuest
-        ? guests.find(g => g.id === seat.assignedGuest)?.name
-        : <span className="text-xs">{seat.row}-{seat.col}</span>
+      
+      // Convert bounding box to grid indices
+      const minCol = Math.max(0, Math.floor((minX - size/2) / hsp));
+      const maxCol = Math.min(cols-1, Math.ceil((maxX - size/2) / hsp));
+      const minRow = Math.max(0, Math.floor((minY - size/2) / vsp));
+      const maxRow = Math.min(rows-1, Math.ceil((maxY - size/2) / vsp));
+      
+      // Iterate only over the grid cells in the bounding box
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          const x = c * hsp + size / 2;
+          const y = r * vsp + size / 2;
+          if (isPointInPoly({ x, y }, poly)) {
+            seatsArr.push({ id: id++, x: r, y: c, assignedGuestId: null });
+          }
+        }
       }
-    </div>
-  );
-})}
-                      <div
-                        key={seat.id}
-                        className="absolute z-10 flex items-center justify-center border bg-white"
-                        style={{ left: seat.x, top: seat.y, width: 40, height: 40 }}
-                      >
-                        <span className="text-xs">{seat.row}-{seat.col}</span>
-                        {seat.assignedGuest && (
-                          <span
-                            className="text-red-600 absolute bottom-0 right-0 text-xs cursor-pointer"
-                            onClick={() => alert('Editar asiento ' + seat.id)}
-                          >
-                            ✏️
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </>
-            ) : (
-              tables.map(table => (
-                <div
-                  key={table.id}
-                  className={`absolute p-2 flex flex-col items-center justify-center ${table.shape === 'circle' ? 'rounded-full' : 'rounded'} bg-gray-200`}
-                  style={{ left: table.x, top: table.y, width: 80, height: 80 }}
-                >
-                  <p className="text-sm font-semibold">{table.name}</p>
-                  <p className="text-xs">{table.capacity} pax</p>
+    });
+    
+    (activeTab === 'ceremony' ? setSeatsCeremony : setSeatsBanquet)(seatsArr);
+  }, [areas, rows, cols, seatSize, activeTab]);
+
+  // draw canvas including all areas and current stroke
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.clearRect(0,0,canvasRef.current.width,canvasRef.current.height);
+    // draw existing areas
+    areas.forEach(poly => {
+      if (poly.length) {
+        ctx.beginPath();
+        poly.forEach((p,i) => i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+        ctx.closePath();
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    });
+    // draw current stroke
+    if (strokePoints.length) {
+      ctx.beginPath();
+      strokePoints.forEach((p,i) => i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }, [areas, strokePoints, shapeFinalized]);
+
+  const toCanvasPt = e => {
+    const rect=canvasRef.current.getBoundingClientRect();
+    return { x:e.clientX-rect.left, y:e.clientY-rect.top };
+  };
+  const handlePointerDown = e => {
+    if (tool === 'pan') {
+      setIsPanning(true);
+      panStartRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+      return;
+    }
+    setIsDrawing(true); setStrokePoints([toCanvasPt(e)]);
+  };
+  const handleMove = e => isDrawing && setStrokePoints(prev=>[...prev,toCanvasPt(e)]);
+  const handleUp = (e) => { 
+    setIsDrawing(false); 
+    const smoothedPoints = smoothStroke(strokePoints);
+    setShapePoints(smoothedPoints);
+    setShapeFinalized(true);
+    // push history snapshot
+    setHistory(h => [...h.slice(0, historyIndex + 1), smoothedPoints]);
+    setHistoryIndex(historyIndex + 1);
+  };
+    const reset = () => { setShapeFinalized(false); setStrokePoints([]); setShapePoints([]); };
+
+  // Añadir área actual a áreas
+  const handleFinalizeArea = () => {
+    if (!shapePoints.length) return;
+    setAreas(prev => [...prev, shapePoints]);
+    setShapePoints([]);
+    setStrokePoints([]);
+    setShapeFinalized(false);
+    setToast({ message: 'Área añadida', type: 'success' });
+  };
+  
+  // Eliminar área por índice
+  const removeArea = index => {
+    setAreas(prev => prev.filter((_, i) => i !== index));
+    setToast({ message: `Área ${index+1} eliminada`, type: 'info' });
+  };
+
+  // Pan & wheel handlers
+  const handlePointerMove = e => {
+    if (isPanning) {
+      setOffset({ x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y });
+      return;
+    }
+    handleMove(e);
+  };
+  const handlePointerUp = e => {
+    if (isPanning) {
+      setIsPanning(false);
+      return;
+    }
+    handleUp(e);
+  };
+  const handleWheel = e => {
+    e.preventDefault();
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mx = (e.clientX - rect.left - offset.x) / scale;
+    const my = (e.clientY - rect.top - offset.y) / scale;
+    const delta = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = scale * delta;
+    const newOffsetX = e.clientX - rect.left - mx * newScale;
+    const newOffsetY = e.clientY - rect.top - my * newScale;
+    setScale(newScale);
+    setOffset({ x: newOffsetX, y: newOffsetY });
+  };
+
+  // Persistence
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const timer = setTimeout(() => {
+      const ref = doc(db, 'seatingPlans', `${auth.currentUser.uid}-${activeTab}`);
+      setDoc(ref, {
+        areas,
+        shapePoints,
+        rows,
+        cols,
+        seatsCeremony,
+        seatsBanquet,
+        updatedAt: new Date()
+      }, { merge: true })
+        .then(() => setToast({ message: 'Autoguardado exitoso', type: 'success' }))
+        .catch(e => setToast({ message: 'Error en autoguardado', type: 'error' }));
+    }, 5000); // Save after 5 seconds of inactivity
+    return () => clearTimeout(timer);
+  }, [areas, shapePoints, rows, cols, seatsCeremony, seatsBanquet, activeTab]);
+
+  const handleLoad = async () => {
+    const ref = doc(db, 'seatingPlans', `${auth.currentUser.uid}-${activeTab}`);
+    if (!ref) return;
+    try {
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const data = snap.data();
+        setRows(data.rows);
+        setCols(data.cols);
+        setAreas(data.areas || []);
+        setShapePoints(data.shapePoints || []);
+        setShapeFinalized(true);
+        setSeatsCeremony(data.seatsCeremony || []);
+        setSeatsBanquet(data.seatsBanquet || []);
+        setToast({ message: 'Plan cargado', type: 'success' });
+      } else {
+        setToast({ message: 'No hay plan guardado', type: 'info' });
+      }
+    } catch (e) {
+      setToast({ message: 'Error al cargar plan', type: 'error' });
+    }
+  };
+
+  // Export
+  const handleExportCSV = () => {
+    const seatsArr = activeTab === 'ceremony' ? seatsCeremony : seatsBanquet;
+    let csv = 'seatId,guestId\n';
+    seatsArr.forEach(s => { csv += `${s.id},${s.assignedGuestId || ''}\n`; });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `seating-${activeTab}.csv`);
+  };
+
+  const handleExportPNG = async () => {
+    if (!containerRef.current) return;
+    try {
+      const canvasImg = await html2canvas(containerRef.current);
+      canvasImg.toBlob(blob => saveAs(blob, `seating-${activeTab}.png`));
+    } catch (e) {
+      setToast({ message: 'Error al exportar imagen', type: 'error' });
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!containerRef.current) return;
+    try {
+      const canvasImg = await html2canvas(containerRef.current);
+      const imgData = canvasImg.toDataURL('image/png');
+      const pdf = new jsPDF('l', 'pt', [canvasImg.width, canvasImg.height]);
+      pdf.addImage(imgData, 'PNG', 0, 0, canvasImg.width, canvasImg.height);
+      pdf.save(`seating-${activeTab}.pdf`);
+    } catch (e) {
+      setToast({ message: 'Error al exportar PDF', type: 'error' });
+    }
+  };
+
+  const seats = activeTab==='ceremony'?seatsCeremony:seatsBanquet;
+  const availableGuests = sampleGuests.filter(g => !seats.some(s => s.assignedGuestId === g.id) && g.name.toLowerCase().includes(searchTerm.toLowerCase()) && (rsvpFilter ? g.rsvp === rsvpFilter : true) && (companyFilter ? g.company.toLowerCase().includes(companyFilter.toLowerCase()) : true));
+
+  const [guestListOpen, setGuestListOpen] = useState(false);
+
+  const handleResize = () => {
+    if (canvasRef.current) {
+      const container = canvasRef.current.parentElement;
+      canvasRef.current.width = container.clientWidth;
+      canvasRef.current.height = container.clientHeight;
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Add smoothStroke function
+  function smoothStroke(points, iterations = 2) {
+    let smoothed = [...points];
+    for (let i = 0; i < iterations; i++) {
+      const newPoints = [];
+      for (let j = 0; j < smoothed.length - 1; j++) {
+        const p0 = smoothed[j];
+        const p1 = smoothed[j+1];
+        const q0 = { x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y };
+        const q1 = { x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y };
+        newPoints.push(q0, q1);
+      }
+      smoothed = newPoints;
+    }
+    return smoothed;
+  }
+
+  return (
+    <div ref={containerRef}>
+      <Card>
+        {toast && <Toast {...toast} onClose={()=>setToast(null)} />}
+        {previewTasks && (
+          <div className="p-4 bg-yellow-100 border rounded mb-4">
+            <h3 className="font-bold mb-2">Vista previa IA</h3>
+            <ul className="list-disc pl-5 mb-2">
+              {previewTasks.map((t,i) => {
+                const guest = sampleGuests.find(g => g.id === t.guestId);
+                return <li key={i}>{guest?.name} → Asiento {t.seatId}</li>;
+              })}
+            </ul>
+            <button onClick={applyPreview} className="px-3 py-1 bg-green-600 text-white rounded mr-2">Aplicar</button>
+            <button onClick={() => setPreviewTasks(null)} className="px-3 py-1 bg-gray-200 rounded">Cancelar</button>
+          </div>
+        )}
+        <div className="flex flex-col lg:flex-row">
+          <div className="w-full lg:w-1/4 mb-4 lg:mb-0">
+            <div className="lg:hidden mb-2">
+              <button 
+                onClick={() => setGuestListOpen(!guestListOpen)}
+                className="px-3 py-1 bg-blue-500 text-white rounded"
+              >
+                {guestListOpen ? 'Hide Guests' : 'Show Guests'}
+              </button>
+            </div>
+            {guestListOpen && (
+              <div className="border rounded p-3 bg-white">
+                <div className="flex items-center border rounded px-2 py-1 mb-2">
+                  <Search size={16} className="mr-2" />
+                  <input type="text" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} className="w-full" />
                 </div>
-              ))
+                <div className="flex space-x-2 mb-2">
+                  <select value={rsvpFilter} onChange={e => setRsvpFilter(e.target.value)} className="border rounded px-1">
+                    <option value="">Todos RSVP</option>
+                    <option value="yes">Sí</option>
+                    <option value="no">No</option>
+                  </select>
+                  <input type="text" value={companyFilter} onChange={e => setCompanyFilter(e.target.value)} className="border rounded px-1" />
+                  <button onClick={bulkAssign} className="px-2 py-1 bg-purple-600 text-white rounded">Bulk Assign</button>
+                </div>
+                <div className="overflow-auto max-h-[400px]">
+                  {availableGuests.map(g=><Guest key={g.id} guest={g} />)}
+                </div>
+              </div>
             )}
           </div>
+          <div className="w-full lg:w-3/4 relative">
+            <div 
+              ref={containerRef} 
+              className="border rounded bg-white overflow-auto"
+              style={{
+                height: '70vh',
+                minHeight: '400px'
+              }}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex space-x-2">
+                  <button onClick={()=>setActiveTab('ceremony')} className={`px-4 py-2 rounded ${activeTab==='ceremony'?'bg-blue-600 text-white':'bg-gray-200'}`}>Ceremonia</button>
+                  <button onClick={()=>setActiveTab('banquet')} className={`px-4 py-2 rounded ${activeTab==='banquet'?'bg-blue-600 text-white':'bg-gray-200'}`}>Banquete</button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="text" placeholder="Criterios IA" className="border rounded px-2 py-1" value={aiPrompt} onChange={e=>setAiPrompt(e.target.value)} />
+                  <button onClick={handleAutoAssign} className="px-3 py-2 bg-gray-200 rounded flex items-center" disabled={aiLoading}>
+                    {aiLoading? <Spinner /> : <Cpu size={16} />}
+                  </button>
+                  <label className="ml-4">Temp:</label>
+                  <input type="range" min="0" max="1" step="0.1" value={aiTemp} onChange={e=>setAiTemp(+e.target.value)} className="w-24" />
+                  <label className="ml-2">Tokens:</label>
+                  <input type="number" min={1} max={2048} value={aiMaxTokens} onChange={e=>setAiMaxTokens(+e.target.value)} className="w-16 border rounded px-1 ml-1" />
+                </div>
+                <div className="flex space-x-2 mb-4">
+                  <button onClick={handleLoad} className="px-3 py-1 bg-blue-600 text-white rounded">Cargar</button>
+                  <button onClick={handleExportCSV} className="px-3 py-1 bg-gray-200 rounded">CSV</button>
+                  <button onClick={handleExportPNG} className="px-3 py-1 bg-gray-200 rounded">PNG</button>
+                  <button onClick={handleExportPDF} className="px-3 py-1 bg-gray-200 rounded">PDF</button>
+                  <button onClick={undo} disabled={historyIndex <= 0} className="px-3 py-1 bg-gray-200 rounded">Undo</button>
+                  <button onClick={redo} disabled={historyIndex >= history.length - 1} className="px-3 py-1 bg-gray-200 rounded">Redo</button>
+                </div>
+                <div className="flex space-x-2 mb-4">
+                  <label>Forma:</label>
+                  <select value={shapeType} onChange={e=>setShapeType(e.target.value)} className="border rounded px-1">
+                    <option value="rect">Rectangular</option>
+                    <option value="circle">Circular</option>
+                  </select>
+                  <label>Tamaño:</label>
+                  <input type="number" min={20} max={200} value={seatSize} onChange={e=>setSeatSize(+e.target.value)} className="w-16 border rounded px-1" />
+                </div>
+                <div role="toolbar" aria-label="Canvas tools" className="flex space-x-2 mb-4">
+                  <button title="Dibujar" onClick={() => setTool('draw')} className="px-2 py-1 bg-gray-200 rounded">✏️</button>
+                  <button title="Mover" onClick={() => setTool('pan')} className="px-2 py-1 bg-gray-200 rounded">✋</button>
+                  <button title="Zoom In" onClick={() => setScale(scale * 1.2)} className="px-2 py-1 bg-gray-200 rounded">➕</button>
+                  <button title="Zoom Out" onClick={() => setScale(scale / 1.2)} className="px-2 py-1 bg-gray-200 rounded">➖</button>
+                </div>
+                <DndProvider backend={backend}>
+                  <div className="flex flex-col md:flex-row space-x-0 md:space-x-6">
+                    <div className="w-full md:w-1/4">
+                      <div className="lg:hidden mb-2">
+                        <button 
+                          onClick={() => setGuestListOpen(!guestListOpen)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded"
+                        >
+                          {guestListOpen ? 'Hide Guests' : 'Show Guests'}
+                        </button>
+                      </div>
+                      {guestListOpen && (
+                        <div className="border rounded p-3 bg-white">
+                          <div className="flex items-center border rounded px-2 py-1 mb-2">
+                            <Search size={16} className="mr-2" />
+                            <input type="text" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} className="w-full" />
+                          </div>
+                          <div className="flex space-x-2 mb-2">
+                            <select value={rsvpFilter} onChange={e => setRsvpFilter(e.target.value)} className="border rounded px-1">
+                              <option value="">Todos RSVP</option>
+                              <option value="yes">Sí</option>
+                              <option value="no">No</option>
+                            </select>
+                            <input type="text" value={companyFilter} onChange={e => setCompanyFilter(e.target.value)} className="border rounded px-1" />
+                            <button onClick={bulkAssign} className="px-2 py-1 bg-purple-600 text-white rounded">Bulk Assign</button>
+                          </div>
+                          <div className="overflow-auto max-h-[400px]">
+                            {availableGuests.map(g=><Guest key={g.id} guest={g} />)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-full md:flex-1">
+                      <div className="border rounded overflow-hidden">
+                        <p className="p-2 text-sm text-gray-600">Dibuja el área con el ratón y haz clic en "Finalizar área"</p>
+                        <canvas ref={canvasRef} width={600} height={400} onWheel={handleWheel} onMouseDown={handlePointerDown} onMouseMove={handlePointerMove} onMouseUp={handlePointerUp} />
+                        {areas.map((_, i) => (
+                          <button key={i} onClick={() => removeArea(i)} title={`Eliminar Área ${i+1}`} aria-label={`Eliminar Área ${i+1}`} className="px-2 py-1 bg-red-500 text-white rounded">Área {i+1} ✖</button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap mt-4">
+                        {seats.map(s=> <Seat key={s.id} seat={s} guest={sampleGuests.find(g=>g.id===s.assignedGuestId)} onDrop={assignGuestToSeat} shapeType={shapeType} seatSize={seatSize} />)}
+                      </div>
+                    </div>
+                  </div>
+                </DndProvider>
+              </div>
+            </div>
+          </div>
         </div>
-      </DndProvider>
-
-      {/* IA y acciones */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Criterios de IA"
-          value={aiPrompt}
-          onChange={e => setAiPrompt(e.target.value)}
-          className="border rounded px-2 py-1 flex-1"
-        />
-        <button onClick={handleAutoAssign} disabled={aiLoading} className="bg-purple-600 text-white px-4 py-1 rounded flex items-center">
-          {aiLoading ? <Spinner /> : (<><Cpu size={16} className="mr-2" />Autoasignar</>)}
-          <Cpu size={16} className="mr-2" />Autoasignar
-        </button>
-        <button className="bg-gray-200 px-4 py-1 rounded">Exportar PDF</button>
-      </div>
+      </Card>
     </div>
-  </>
   );
 }
