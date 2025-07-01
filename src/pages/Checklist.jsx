@@ -50,9 +50,7 @@ export default function Checklist() {
         </select>
         <input type="date" value={dateFilter.from} onChange={e => setDateFilter(prev => ({...prev, from: e.target.value}))} className="border rounded px-2 py-1" />
         <input type="date" value={dateFilter.to} onChange={e => setDateFilter(prev => ({...prev, to: e.target.value}))} className="border rounded px-2 py-1" />
-        <button onClick={() => setView(view === 'list' ? 'cards' : 'list')} className="bg-gray-200 px-2 py-1 rounded">
-          {view === 'list' ? 'Ver Tarjetas' : 'Ver Lista'}
-        </button>
+
         <button onClick={() => setShowNewModal(true)} className="bg-blue-600 text-white px-3 py-1 rounded flex items-center">
           <Plus size={16} className="mr-1" /> Nueva Tarea
         </button>
@@ -98,20 +96,7 @@ export default function Checklist() {
         </table>
       )}
 
-      {/* Vista Tarjetas */}
-      {view === 'cards' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {blocks.flatMap(block =>
-            block.tasks.map(t => (
-              <div key={t.id} className="border p-4 rounded shadow">
-                <p className="font-semibold">{t.title}</p>
-                <p className="text-sm text-gray-600">{t.responsible} - {t.due}</p>
-                <button className="mt-2 text-gray-600">Drag</button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+
 
       {/* Modal Nueva Tarea */}
       {showNewModal && (

@@ -1,67 +1,76 @@
-import React, { useEffect } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Card from '../../components/Card';
 
-const ProtocoloLayout = () => {
+// Definición estática de las pestañas para evitar recreaciones
+const tabs = [
+  { path: 'momentos-especiales', label: 'Momentos Especiales' },
+];
+
+// Componente memoizado para evitar renders innecesarios
+const ProtocoloLayout = React.memo(() => {
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // Redirigir a la primera pestaña si estamos en la raíz de protocolo
+
+  /* Redirigir a la primera pestaña si estamos en la raíz de protocolo */
   useEffect(() => {
     if (location.pathname === '/protocolo' || location.pathname === '/protocolo/') {
       navigate('/protocolo/momentos-especiales', { replace: true });
     }
   }, [location.pathname, navigate]);
 
-  const isActive = (path) => {
-    return location.pathname === `/protocolo/${path}` || 
-           location.pathname === `/protocolo/${path}/`;
+  // Memoizamos la lista de pestañas con sus rutas completas
+  const navTabs = useMemo(() => tabs.map(t => ({ ...t, href: `/protocolo/${t.path}` })), []);
+
+  // Placeholder de carga accesible
+  if (location.pathname === '/protocolo' || location.pathname === '/protocolo/') {
+    return (
+      <div className="p-6" role="status" aria-live="polite">
+        Cargando...
+      </div>
+    );
   };
 
-  // Si estamos en la raíz, mostrar un mensaje de carga
-  if (location.pathname === '/protocolo' || location.pathname === '/protocolo/') {
-    return <div className="p-6">Cargando...</div>;
-  }
-
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Protocolo de la Boda</h1>
-      
-      {/* Navegación por pestañas */}
-      <div className="flex space-x-2 overflow-x-auto pb-2 mb-6">
-        {[
-          { path: 'momentos-especiales', label: 'Momentos Especiales' },
-          { path: 'timing', label: 'Timing' },
-          { path: 'checklist', label: 'Checklist' },
-          { path: 'ayuda-ceremonia', label: 'Ayuda Ceremonia' },
-        ].map((tab) => (
-          <Link
+    <section className="p-6 flex flex-col gap-6" aria-labelledby="protocolo-heading">
+      <h1 id="protocolo-heading" className="text-2xl font-bold text-gray-800">
+        Protocolo de la Boda
+      </h1>
+
+      {/* Navegación accesible por pestañas */}
+      <nav role="tablist" aria-label="Secciones de Protocolo" className="flex overflow-x-auto space-x-2 pb-2">
+        {navTabs.map(tab => (
+          <NavLink
             key={tab.path}
-            to={`/protocolo/${tab.path}`}
-            className={`px-4 py-2 rounded-t-lg font-medium whitespace-nowrap ${
-              isActive(tab.path)
-                ? 'bg-white border-t-2 border-l-2 border-r-2 border-blue-500 text-blue-600 font-semibold'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            to={tab.href}
+            role="tab"
+            aria-current={location.pathname === tab.href ? 'page' : undefined}
+            className={({ isActive }) =>
+              `px-4 py-2 rounded-t-lg font-medium whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 ${
+                isActive
+                  ? 'bg-white border-t-2 border-l-2 border-r-2 border-blue-500 text-blue-600 font-semibold'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`
+            }
           >
             {tab.label}
-          </Link>
+          </NavLink>
         ))}
-      </div>
+      </nav>
 
-      {/* Contenido de la página */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Contenido */}
+      <Card className="overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" role="region" aria-label="Contenido de Protocolo">
         <div className="p-6">
           <Outlet />
         </div>
-      </div>
-      
-      {/* Mensaje de depuración */}
-      <div className="mt-4 p-3 bg-gray-100 text-sm text-gray-600 rounded">
-        <p>Ruta actual: {location.pathname}</p>
-      </div>
-    </div>
+      </Card>
+
+      {/* Ruta actual solo visible para accesibilidad */}
+      <p className="sr-only" data-testid="current-path">
+        Ruta actual: {location.pathname}
+      </p>
+    </section>
   );
-};
+});
 
 export default ProtocoloLayout;

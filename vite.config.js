@@ -3,6 +3,13 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  server: { host: true },
-  // Custom server config removed so Vite will start on default port without strict port enforcement
+  server: { 
+    host: true,
+    port: 3000,
+    strictPort: true
+  },
+  preview: {
+    port: 3000,
+    strictPort: true
+  }
 });

@@ -48,8 +48,16 @@ export default function ChatWidget() {
             <MessageSquare className="mr-2" /> Chat IA
           </div>
           <div className="flex-1 p-2 overflow-y-auto relative">
-                          {loading && <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75"><Spinner /></div>}
-              <div key={i} className={`mb-2 ${m.from === 'user' ? 'text-right' : 'text-left'}`}>
+                          {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+                <Spinner />
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={`mb-2 ${m.from === 'user' ? 'text-right' : 'text-left'}`}
+              >
                 <span className="inline-block p-2 rounded bg-gray-200">{m.text}</span>
               </div>
             ))}

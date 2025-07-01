@@ -121,7 +121,7 @@ export default function Tasks() {
     const maxDate = new Date(maxTime);
     const monthsCount = (maxDate.getFullYear() - minDate.getFullYear()) * 12 + (maxDate.getMonth() - minDate.getMonth()) + 1;
     const availableWidth = containerWidth - listCellWidth;
-    const cw = Math.min(Math.floor(availableWidth / monthsCount), 50); // cap column width at 50px to avoid horizontal scroll // cap column width at 60px to further avoid horizontal scroll // cap column width at 80px to avoid horizontal scroll // cap column width at 80px to avoid horizontal scroll
+    const cw = Math.floor(availableWidth / monthsCount); // calculate width so all months fit; remove hard cap to prevent overlap
     setColumnWidthState(cw);
   }, [tasks]);
   const allEvents = [ ...meetings, ...tasks.map(task => ({ id: task.id, title: task.name, start: task.start, end: task.end, type: 'task', desc: `Progreso: ${task.progress}%`, category: task.category })) ];

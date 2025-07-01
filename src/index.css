@@ -1,6 +1,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Ocultar flechas de los inputs number */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
 @layer base {
   /* Dark mode base styles */
   .dark body { @apply bg-gray-900 text-gray-100; }
@@ -9,11 +19,22 @@
   }
   h1 { @apply font-bold text-4xl; }
   h1.text-2xl { @apply text-4xl; }
-h2, h3, h4, h5, h6 {
+  h2, h3, h4, h5, h6 {
     @apply font-bold;
   }
   a {
     @apply text-pastel-blue hover:underline;
-    
+  }
+  p {
+    @apply mb-4 leading-relaxed;
+  }
+  ul, ol {
+    @apply list-disc pl-5 mb-4;
+  }
+  button {
+    @apply bg-pastel-blue hover:bg-pastel-purple text-gray-800 font-semibold py-2 px-4 rounded transition-colors duration-200;
+  }
+  input, select, textarea {
+    @apply border border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-pastel-blue focus:border-transparent;
   }
 }

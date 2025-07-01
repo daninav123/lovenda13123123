@@ -7,7 +7,109 @@ import { useUserContext } from '../context/UserContext';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-export default function Perfil() {
+// ---------------------- NUEVO PERFIL -----------------------
+function Perfil() {
+  const [subscription, setSubscription] = useState('free');
+  const [account, setAccount] = useState({
+    name: '',
+    linkedAccount: '',
+    planner: '',
+    helpers: '',
+    email: '',
+    password: '',
+  });
+  const [weddingInfo, setWeddingInfo] = useState({
+    coupleName: '',
+    celebrationPlace: '',
+    banquetPlace: '',
+    schedule: '',
+    giftAccount: '',
+  });
+  const [billing, setBilling] = useState({
+    fullName: '',
+    address: '',
+    zip: '',
+    city: '',
+    state: '',
+    country: '',
+    dni: '',
+  });
+
+  const handleAccountChange = (e) => setAccount({ ...account, [e.target.name]: e.target.value });
+  const handleWeddingChange = (e) => setWeddingInfo({ ...weddingInfo, [e.target.name]: e.target.value });
+  const handleBillingChange = (e) => setBilling({ ...billing, [e.target.name]: e.target.value });
+
+  const saveProfile = () => console.log({ subscription, account, weddingInfo, billing });
+
+  return (
+    <div className="space-y-6 p-4 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-semibold">Perfil</h1>
+
+      {/* Suscripción */}
+      <Card className="space-y-4">
+        <h2 className="text-lg font-medium">Tipo de suscripción</h2>
+        <div className="flex gap-4">
+          <Button variant={subscription === 'free' ? 'primary' : 'outline'} onClick={() => setSubscription('free')}>Gratis</Button>
+          <Button variant={subscription === 'premium' ? 'primary' : 'outline'} onClick={() => setSubscription('premium')}>Premium</Button>
+        </div>
+      </Card>
+
+      {/* Información de la cuenta */}
+      <Card className="space-y-4">
+        <h2 className="text-lg font-medium">Información de la cuenta</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input label="Nombre" name="name" value={account.name} onChange={handleAccountChange} />
+          <Input label="Cuenta vinculada" name="linkedAccount" value={account.linkedAccount} onChange={handleAccountChange} />
+          <Input label="Wedding planner vinculada" name="planner" value={account.planner} onChange={handleAccountChange} />
+          <Input label="Ayudantes vinculados" name="helpers" value={account.helpers} onChange={handleAccountChange} />
+          <Input label="Correo electrónico" name="email" type="email" value={account.email} onChange={handleAccountChange} />
+          <Input label="Reestablecer contraseña" name="password" type="password" value={account.password} onChange={handleAccountChange} />
+        </div>
+        <div className="text-right">
+          <Button onClick={saveProfile}>Guardar</Button>
+        </div>
+      </Card>
+
+      {/* Información de la boda */}
+      <Card className="space-y-4">
+        <h2 className="text-lg font-medium">Información de la boda</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input label="Nombre de la pareja" name="coupleName" value={weddingInfo.coupleName} onChange={handleWeddingChange} />
+          <Input label="Lugar de la celebración" name="celebrationPlace" value={weddingInfo.celebrationPlace} onChange={handleWeddingChange} />
+          <Input label="Lugar del banquete" name="banquetPlace" value={weddingInfo.banquetPlace} onChange={handleWeddingChange} />
+          <Input label="Horario" name="schedule" value={weddingInfo.schedule} onChange={handleWeddingChange} />
+          <Input label="Cuenta de regalos" name="giftAccount" value={weddingInfo.giftAccount} onChange={handleWeddingChange} />
+        </div>
+        <div className="text-right">
+          <Button onClick={saveProfile}>Guardar</Button>
+        </div>
+      </Card>
+
+      {/* Datos de facturación */}
+      <Card className="space-y-4">
+        <h2 className="text-lg font-medium">Datos de facturación</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input label="Nombre completo" name="fullName" value={billing.fullName} onChange={handleBillingChange} />
+          <Input label="Dirección" name="address" value={billing.address} onChange={handleBillingChange} />
+          <Input label="CP" name="zip" value={billing.zip} onChange={handleBillingChange} />
+          <Input label="Localidad" name="city" value={billing.city} onChange={handleBillingChange} />
+          <Input label="Provincia" name="state" value={billing.state} onChange={handleBillingChange} />
+          <Input label="País" name="country" value={billing.country} onChange={handleBillingChange} />
+          <Input label="DNI" name="dni" value={billing.dni} onChange={handleBillingChange} />
+        </div>
+        <div className="text-right">
+          <Button onClick={saveProfile}>Guardar</Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export default Perfil;
+
+// -----------------------------------------------------------
+
+function LegacyPerfil() {
   const navigate = useNavigate();
   const { 
     user, 
@@ -20,6 +122,8 @@ export default function Perfil() {
   } = useUserContext();
   
   const [activeTab, setActiveTab] = useState('profile');
+  // Estado para mostrar/ocultar menú lateral en pantallas pequeñas
+  const [menuOpen, setMenuOpen] = useState(false);
   const [form, setForm] = useState({ 
     displayName: '', 
     email: '', 
@@ -122,43 +226,54 @@ export default function Perfil() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-center mb-8">Configuración de Cuenta</h1>
       
+      {/* Botón hamburguesa para móviles */}
+      <button
+        type="button"
+        onClick={() => setMenuOpen(prev => !prev)}
+        className="md:hidden mb-4 px-4 py-2 bg-blue-600 text-white rounded"
+        aria-expanded={menuOpen}
+        aria-controls="sidebar-menu"
+      >
+        {menuOpen ? 'Cerrar menú' : 'Menú'}
+      </button>
+
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar */}
-        <div className="w-full md:w-64 flex-shrink-0">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div id="sidebar-menu" className={`${menuOpen ? 'block' : 'hidden'} md:block w-full md:w-64 flex-shrink-0`}>
+          <Card className="p-4">
             <div className="space-y-1">
               <button
-                onClick={() => setActiveTab('profile')}
+                onClick={() => { setActiveTab('profile'); setMenuOpen(false); }}
                 className={`w-full text-left px-4 py-2 rounded-md ${
                   activeTab === 'profile' 
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Perfil
               </button>
               <button
-                onClick={() => setActiveTab('password')}
+                onClick={() => { setActiveTab('password'); setMenuOpen(false); }}
                 className={`w-full text-left px-4 py-2 rounded-md ${
                   activeTab === 'password' 
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Contraseña
               </button>
               <button
-                onClick={() => setActiveTab('email')}
+                onClick={() => { setActiveTab('email'); setMenuOpen(false); }}
                 className={`w-full text-left px-4 py-2 rounded-md ${
                   activeTab === 'email' 
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Correo Electrónico
               </button>
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* Main Content */}
@@ -170,7 +285,7 @@ export default function Perfil() {
               <form onSubmit={handleProfileSubmit}>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de Usuario
                     </label>
                     <Input
@@ -183,7 +298,7 @@ export default function Perfil() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de la Boda
                     </label>
                     <Input
@@ -195,7 +310,7 @@ export default function Perfil() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       URL del Logo
                     </label>
                     <Input
@@ -208,7 +323,7 @@ export default function Perfil() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de la Pareja
                     </label>
                     <Input
@@ -220,7 +335,7 @@ export default function Perfil() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Correo de la Pareja
                     </label>
                     <Input
@@ -248,7 +363,7 @@ export default function Perfil() {
               <form onSubmit={handlePasswordSubmit}>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Contraseña Actual
                     </label>
                     <Input
@@ -261,7 +376,7 @@ export default function Perfil() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nueva Contraseña
                     </label>
                     <Input
@@ -275,7 +390,7 @@ export default function Perfil() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Confirmar Nueva Contraseña
                     </label>
                     <Input
@@ -304,11 +419,11 @@ export default function Perfil() {
               <h2 className="text-2xl font-semibold mb-6">Correo Electrónico</h2>
               
               <div className="space-y-6">
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <div className="p-4 bg-blue-50 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Estado de Verificación</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                      <p className="text-sm text-gray-600">
                         {user.emailVerified 
                           ? 'Tu correo electrónico ha sido verificado.' 
                           : 'Tu correo electrónico no ha sido verificado.'}
@@ -326,9 +441,9 @@ export default function Perfil() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <div className="p-4 bg-yellow-50 rounded-lg">
                   <h3 className="font-medium mb-2">Restablecer Contraseña</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  <p className="text-sm text-gray-600 mb-3">
                     ¿Olvidaste tu contraseña? Te enviaremos un enlace para restablecerla a tu correo electrónico.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3">

@@ -4,494 +4,267 @@ import Pagination from '../components/Pagination';
 import Toast from '../components/Toast';
 import { saveAs } from 'file-saver';
 import { getTransactions } from '../services/bankService';
-import { Plus, AlertCircle, Clock, CheckCircle, AlertTriangle, Download, Upload } from 'lucide-react';
+import { Plus, Link2, Edit3, Settings, AlertCircle, Clock, CheckCircle, AlertTriangle, Download, Upload } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { CategoryBreakdown } from '../components/finance/CategoryBreakdown';
 import { BudgetAlerts } from '../components/finance/BudgetAlerts';
 import { VendorPayments } from '../components/finance/VendorPayments';
+import Modal from '../components/Modal';
 
-export default function Finance() {
-  const [transactions, setTransactions] = useState([]);
-  const [totals, setTotals] = useState({ income: 0, expense: 0 });
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [providerFilter, setProviderFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const initialTransaction = { item: '', category: '', provider: '', estimatedCost: '', realCost: '', paymentDate: '', status: '', type: '' };
-  const [newTransaction, setNewTransaction] = useState(initialTransaction);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [modalError, setModalError] = useState(null);
-  const pageSize = 5;
-  const currencyFormatter = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' });
-  const [toast, setToast] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+// -------------------------- NUEVA PÁGINA FINANZAS --------------------------
+function Finance() {
+  const locationHash = typeof window !== 'undefined' ? window.location.hash : '';
 
-  const handleSort = key => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-    setSortConfig({ key, direction });
-  };
+  const [configOpen, setConfigOpen] = React.useState(false);
+  // Estado para aportaciones y regalos
+  const [personA, setPersonA] = React.useState(0);
+  const [personB, setPersonB] = React.useState(0);
+  const [giftPerGuest, setGiftPerGuest] = React.useState(0);
+  const [guestCount, setGuestCount] = React.useState(0);
+  const [monthlyContrib, setMonthlyContrib] = React.useState(0); // suma de A+B
+  const [expectedIncome, setExpectedIncome] = React.useState(0);
 
-  const handleInputChange = e => {
-    const { name, value } = e.target;
-    setNewTransaction(prev => ({ ...prev, [name]: value }));
-  };
+  // Datos simulados (reemplazar por API/estado real)
+  const balance = 12000;
+  const [manualOpen, setManualOpen] = useState(false);
 
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setNewTransaction(initialTransaction);
-  };
-
-  const handleAddTransaction = e => {
-    e.preventDefault();
-    if (!newTransaction.item || !newTransaction.category || !newTransaction.provider || !newTransaction.realCost || !newTransaction.paymentDate || !newTransaction.status || !newTransaction.type) {
-      setModalError('Por favor completa todos los campos');
-      return;
+  // Abrir modal de nuevo movimiento si la URL contiene #nuevo
+  React.useEffect(() => {
+    if (locationHash === '#nuevo') {
+      setManualOpen(true);
+      window.history.replaceState(null, '', window.location.pathname);
     }
-    setModalError(null);
-    const newTx = {
-      id: Date.now().toString(),
-      item: newTransaction.item,
-      category: newTransaction.category,
-      provider: newTransaction.provider,
-      estimatedCost: parseFloat(newTransaction.estimatedCost) || 0,
-      realCost: parseFloat(newTransaction.realCost) || 0,
-      paymentDate: newTransaction.paymentDate,
-      status: newTransaction.status,
-      type: newTransaction.type,
-      amount: parseFloat(newTransaction.realCost) || 0,
-    };
-    const updated = [...transactions, newTx];
-    setTransactions(updated);
-    const inc = updated.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const exp = updated.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    setTotals({ income: inc, expense: exp });
-    setModalOpen(false);
-    setNewTransaction(initialTransaction);
-  };
-
-  const exportCsv = () => {
-    const headers = ['Ítem', 'Categoría', 'Proveedor', 'Coste Previsto', 'Coste Real', 'Fecha de Pago', 'Estado', 'Tipo'];
-    const rows = transactions.map(t => [
-      t.item, t.category, t.provider,
-      currencyFormatter.format(t.estimatedCost),
-      currencyFormatter.format(t.realCost),
-      t.paymentDate, t.status, t.type
-    ]);
-    const csvContent = [headers, ...rows].map(r => r.join(';')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, 'transacciones.csv');
-    setToast({ message: 'CSV exportado correctamente', type: 'success' });
-  };
-
-  const [monthlyContrib, setMonthlyContrib] = useState(0);
-  const [expectedIncome, setExpectedIncome] = useState(0);
-  const paidTotal = transactions.filter(t => t.status === 'paid').reduce((s, t) => s + t.realCost, 0);
-  const outstandingTotal = transactions.filter(t => t.status !== 'paid').reduce((s, t) => s + t.estimatedCost, 0);
-
-  useEffect(() => {
-    setLoading(true);
-    getTransactions()
-      .then(data => {
-        setTransactions(data);
-        const inc = data.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-        const exp = data.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-        setTotals({ income: inc, expense: exp });
-        setError(null);
-      })
-      .catch(err => { setError(err.message); setToast({ message: err.message, type: 'error' }); })
-      .finally(() => setLoading(false));
   }, []);
+  const [newMovement, setNewMovement] = useState({ concept: '', amount: 0, date: '', type: 'expense' });
+  // Presupuesto total y categorías
+  const [totalBudget, setTotalBudget] = useState(30000);
+  const [categories, setCategories] = useState([
+    { name: 'Catering', amount: 8000 },
+    { name: 'Música', amount: 2000 },
+    { name: 'Flores', amount: 1500 },
+    { name: 'Luna de miel', amount: 5000 },
+  ]);
+  const emergencyAmount = Math.round(totalBudget * 0.1);
 
-  const handleConnectBank = () => {
-    setLoading(true);
-    getTransactions()
-      .then(data => {
-        setTransactions(data);
-        const inc = data.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-        const exp = data.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-        setTotals({ income: inc, expense: exp });
-        setError(null);
-      })
-      .catch(err => { setError(err.message); setToast({ message: err.message, type: 'error' }); })
-      .finally(() => setLoading(false));
+  const addCategory = () => {
+    const name = prompt('Nombre de la categoría');
+    if (name && !categories.find(c => c.name === name)) {
+      setCategories([...categories, { name, amount: 0 }]);
+    }
+  };
+  const updateCategory = (idx, value) => {
+    const next = [...categories];
+    next[idx].amount = Number(value);
+    setCategories(next);
   };
 
-  const filteredTransactions = transactions.filter(t => {
-    if (categoryFilter && t.category !== categoryFilter) return false;
-    if (providerFilter && t.provider !== providerFilter) return false;
-    if (statusFilter && t.status !== statusFilter) return false;
-    if (fromDate && t.paymentDate < fromDate) return false;
-    if (toDate && t.paymentDate > toDate) return false;
-    return true;
-  });
-
-  const sortedTransactions = useMemo(() => {
-    if (!sortConfig.key) return filteredTransactions;
-    return [...filteredTransactions].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredTransactions, sortConfig]);
-
-  const totalPages = Math.ceil(sortedTransactions.length / pageSize);
-  const paginatedTransactions = sortedTransactions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const data = [
-    { name: 'Enero', income: 1000, expense: 500 },
-    { name: 'Febrero', income: 1200, expense: 600 },
-    { name: 'Marzo', income: 1500, expense: 700 },
-    { name: 'Abril', income: 1800, expense: 800 },
-    { name: 'Mayo', income: 2000, expense: 900 },
+  const upcomingExpenses = [
+    { id: 1, name: 'Fotógrafo', amount: 800, date: '2025-07-10' },
+    { id: 2, name: 'Florería', amount: 600, date: '2025-07-15' },
+  ];
+  const upcomingIncomes = [
+    { id: 1, name: 'Regalo padres', amount: 2000, date: '2025-07-20' },
+  ];
+  const pendingExpenses = upcomingExpenses;
+  const history = [
+    { id: 1, name: 'Reserva finca', amount: 3000, date: '2025-06-01', type: 'expense' },
+    { id: 2, name: 'Aportación Persona A', amount: 5000, date: '2025-05-30', type: 'income' },
   ];
 
-  const pieData = [
-    { name: 'Gastos', value: totals.expense },
-    { name: 'Ingresos', value: totals.income },
-  ];
-
-  const projectedData = useMemo(() => {
-    let balance = totals.income - totals.expense;
-    return data.map(item => {
-      balance += monthlyContrib + expectedIncome / data.length - item.expense + item.income;
-      return { name: item.name, projected: parseFloat(balance.toFixed(2)) };
-    });
-  }, [data, totals, monthlyContrib, expectedIncome]);
-
-  const categoriesList = useMemo(
-    () => Array.from(new Set(transactions.map(t => t.category))).sort(),
-    [transactions]
-  );
-
-  const providersList = useMemo(
-    () => Array.from(new Set(transactions.map(t => t.provider))).sort(),
-    [transactions]
-  );
-
-  const budgetLimits = {
-    'Catering': 5000,
-    'Localizacion': 3000,
-    'Vestuario': 2000,
-    'Decoracion': 1500,
-    'Fotografia': 2500,
-    'Musica': 1000,
-    'Otros': 1000
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner />
-      </div>
-    );
-  }
+  const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 space-y-6">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      
-      {/* Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Finanzas</h1>
-          <p className="text-sm text-gray-500">Gestiona tu presupuesto y pagos</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={handleConnectBank}>
-            <Upload className="w-4 h-4 mr-2" />
-            Importar
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportCsv}>
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </Button>
-          <Button variant="primary" onClick={() => setModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Movimiento
-          </Button>
-        </div>
-      </div>
-      {/* Resumen financiero */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-green-50 border-green-200">
-          <p className="text-sm text-green-600">Ingresos</p>
-          <p className="text-2xl font-bold text-green-700">€{totals.income.toFixed(2)}</p>
-        </Card>
-        <Card className="p-4 bg-red-50 border-red-200">
-          <p className="text-sm text-red-600">Gastos</p>
-          <p className="text-2xl font-bold text-red-700">€{totals.expense.toFixed(2)}</p>
-        </Card>
-        <Card className="p-4 bg-blue-50 border-blue-200">
-          <p className="text-sm text-blue-600">Saldo</p>
-          <p className={`text-2xl font-bold ${(totals.income - totals.expense) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-            €{(totals.income - totals.expense).toFixed(2)}
-          </p>
-        </Card>
-        <Card className="p-4 bg-yellow-50 border-yellow-200">
-          <p className="text-sm text-yellow-600">Presupuesto Restante</p>
-          <p className="text-2xl font-bold text-yellow-700">
-            €{(expectedIncome - totals.expense).toFixed(2)}
-          </p>
-        </Card>
-      </div>
-      {/* Sección de métricas adicionales */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4 text-center">
-          <p className="text-sm text-gray-500">Aportación Mensual</p>
-          <p className="text-xl font-bold">€{monthlyContrib.toFixed(2)}</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <p className="text-sm text-gray-500">Próximos Gastos</p>
-          <p className="text-xl font-bold">€{outstandingTotal.toFixed(2)}</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <p className="text-sm text-gray-500">Saldo Total</p>
-          <p className={`text-2xl font-bold ${(totals.income - totals.expense) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-            €{(totals.income - totals.expense).toFixed(2)}
-          </p>
-        </Card>
-      </div>
-
-      {/* Componentes de análisis */}
-      <BudgetAlerts transactions={transactions} budgetLimits={budgetLimits} />
-      <VendorPayments transactions={transactions} />
-      
-      {/* Gráficos de desglose */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CategoryBreakdown transactions={transactions} type="expense" />
-        <CategoryBreakdown transactions={transactions} type="income" />
-      </div>
-
-      {/* Tabla de transacciones */}
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <h3 className="text-lg font-semibold">Últimas Transacciones</h3>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <select 
-              className="text-sm border rounded px-2 py-1 w-full sm:w-auto" 
-              value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value)}
-              aria-label="Filtrar por estado"
-            >
-              <option value="">Todos los estados</option>
-              <option value="pending">Pendiente</option>
-              <option value="paid">Pagado</option>
-              <option value="overdue">Vencido</option>
-            </select>
-            <input 
-              type="date" 
-              className="text-sm border rounded px-2 py-1 w-full sm:w-auto" 
-              value={fromDate} 
-              onChange={(e) => setFromDate(e.target.value)} 
-              placeholder="Desde"
-              aria-label="Fecha desde"
-            />
-            <input 
-              type="date" 
-              className="text-sm border rounded px-2 py-1 w-full sm:w-auto" 
-              value={toDate} 
-              onChange={(e) => setToDate(e.target.value)} 
-              placeholder="Hasta"
-              aria-label="Fecha hasta"
-            />
-          </div>
-        </div>
+    <div className="space-y-6 p-4">
+      <h1 className="text-2xl font-semibold">Finanzas</h1>
+      <div className="flex flex-wrap gap-2 my-4">
+        <Button leftIcon={<Link2 size={18} />} onClick={() => alert('Función de vincular banco próximamente')}>Vincular banco</Button>
+        <Button leftIcon={<Edit3 size={18} />} onClick={() => setManualOpen(true)}>Añadir movimiento</Button>
+        <Button leftIcon={<Settings size={18} />} onClick={() => setConfigOpen(true)}>Configuración</Button>
         
-        {/* Tabla de transacciones */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr className="text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
-                <th className="px-6 py-3">Concepto</th>
-                <th className="px-6 py-3">Categoría</th>
-                <th className="px-6 py-3">Proveedor</th>
-                <th className="px-6 py-3 text-right">Presupuestado</th>
-                <th className="px-6 py-3 text-right">Real</th>
-                <th className="px-6 py-3">Fecha</th>
-                <th className="px-6 py-3">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedTransactions.length > 0 ? (
-                paginatedTransactions.map(t => (
-                  <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{t.item}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {t.category}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {t.provider}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                      {t.estimatedCost ? currencyFormatter.format(t.estimatedCost) : '-'}
-                    </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${
-                      t.type === 'income' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {t.realCost ? currencyFormatter.format(t.realCost) : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(t.paymentDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        t.status === 'paid' ? 'bg-green-100 text-green-800' :
-                        t.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {t.status === 'paid' ? 'Pagado' :
-                         t.status === 'pending' ? 'Pendiente' : 'Vencido'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
-                    No hay transacciones que coincidan con los filtros seleccionados
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
         
-        {/* Paginación */}
-        {totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-            <div className="flex flex-1 justify-between sm:hidden">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
-                Siguiente
-              </button>
-            </div>
-            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> a{' '}
-                  <span className="font-medium">
-                    {Math.min(currentPage * pageSize, filteredTransactions.length)}
-                  </span>{' '}
-                  de <span className="font-medium">{filteredTransactions.length}</span> resultados
-                </p>
-              </div>
-              <div>
-                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                  >
-                    <span className="sr-only">Anterior</span>
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                          currentPage === pageNum
-                            ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
-                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                  >
-                    <span className="sr-only">Siguiente</span>
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </div>
-        )}
+      </div>
+      <Card className="flex-1 min-w-[260px] text-center">
+        <h2 className="text-lg font-medium mb-2">Saldo disponible</h2>
+        <p className="text-4xl font-bold text-green-600">{fmt.format(balance)}</p>
       </Card>
 
-      {/* Botón flotante para agregar transacciones */}
-      <Button 
-        className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg z-50 transition-all duration-200 transform hover:scale-110" 
-        onClick={() => setModalOpen(true)} 
-        aria-label="Agregar transacción"
-      >
-        <Plus className="w-6 h-6" />
-      </Button>
-      {modalOpen && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-          <Card className="w-full max-w-lg mx-4 p-6">
-            <h2 id="modal-title" className="text-xl font-bold mb-4">Agregar transacción</h2>
-            {modalError && <div role="alert" className="text-red-600 mb-2">{modalError}</div>}
-            <form onSubmit={handleAddTransaction} aria-labelledby="modal-title">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <input name="item" value={newTransaction.item} onChange={handleInputChange} placeholder="Ítem" className="border rounded px-2 py-1 w-full" />
-                <input name="category" value={newTransaction.category} onChange={handleInputChange} placeholder="Categoría" className="border rounded px-2 py-1 w-full" />
-                <input name="provider" value={newTransaction.provider} onChange={handleInputChange} placeholder="Proveedor" className="border rounded px-2 py-1 w-full" />
-                <input name="estimatedCost" value={newTransaction.estimatedCost} onChange={handleInputChange} type="number" placeholder="Coste previsto" className="border rounded px-2 py-1 w-full" />
-                <input name="realCost" value={newTransaction.realCost} onChange={handleInputChange} type="number" placeholder="Coste real" className="border rounded px-2 py-1 w-full" />
-                <input name="paymentDate" value={newTransaction.paymentDate} onChange={handleInputChange} type="date" placeholder="Fecha de pago" className="border rounded px-2 py-1 w-full" />
-                <select name="type" value={newTransaction.type} onChange={handleInputChange} className="border rounded px-2 py-1 w-full" aria-label="Tipo de transacción">
-                  <option value="">Tipo</option>
-                  <option value="income">Ingreso</option>
-                  <option value="expense">Gasto</option>
-                </select>
-                <select name="status" value={newTransaction.status} onChange={handleInputChange} className="border rounded px-2 py-1 w-full" aria-label="Estado">
-                  <option value="">Estado</option>
-                  <option value="pending">Pendiente</option>
-                  <option value="paid">Pagado</option>
-                </select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-                <Button type="submit">Agregar</Button>
-              </div>
-            </form>
+        
+          <Card className="flex-1 min-w-[220px]">
+            <h3 className="font-medium mb-2">Próximos gastos</h3>
+            <ul className="text-sm space-y-1">
+              {upcomingExpenses.map(e => (
+                <li key={e.id} className="flex justify-between">
+                  <span>{e.name}</span>
+                  <span className="text-red-600">{fmt.format(e.amount)}</span>
+                </li>
+              ))}
+            </ul>
           </Card>
+          <Card className="flex-1 min-w-[220px]">
+            <h3 className="font-medium mb-2">Próximos ingresos</h3>
+            <ul className="text-sm space-y-1">
+              {upcomingIncomes.map(i => (
+                <li key={i.id} className="flex justify-between">
+                  <span>{i.name}</span>
+                  <span className="text-green-600">{fmt.format(i.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        
+
+        
+
+        
+      
+
+      {/* Tabla gastos pendientes */}
+      <Card>
+        <h3 className="font-medium mb-2">Gastos pendientes</h3>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left">
+              <th>Concepto</th>
+              <th>Fecha</th>
+              <th>Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendingExpenses.map(e => (
+              <tr key={e.id} className="border-t">
+                <td>{e.name}</td>
+                <td>{e.date}</td>
+                <td className="text-red-600">{fmt.format(e.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      {/* Planificación de presupuesto */}
+      <Card className="space-y-4">
+        <h3 className="font-medium text-lg">Planificación de presupuesto</h3>
+        <div className="flex items-center space-x-2">
+          <span>Presupuesto total:</span>
+          <input
+            type="number"
+            className="border rounded px-2 py-1 w-32"
+            value={totalBudget}
+            onChange={e => setTotalBudget(Number(e.target.value))}
+          />
         </div>
-      )}
+        
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left">
+              <th>Categoría</th>
+              <th>Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map((cat, idx) => (
+              <tr key={cat.name} className="border-t">
+                <td className="py-1">{cat.name}</td>
+                <td className="py-1">
+                  <input
+                    type="number"
+                    className="border rounded px-1 w-24"
+                    value={cat.amount}
+                    onChange={e => updateCategory(idx, e.target.value)}
+                  />
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t font-medium">
+              <td className="py-1">Fondo de emergencia (10%)</td>
+              <td className="py-1">{fmt.format(emergencyAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <Button variant="secondary" onClick={addCategory}>+ Añadir categoría</Button>
+      </Card>
+
+      {/* Historial */}
+      <Card>
+        <h3 className="font-medium mb-2">Histórico de gastos e ingresos</h3>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left">
+              <th>Concepto</th>
+              <th>Fecha</th>
+              <th>Importe</th>
+              <th>Tipo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.map(r => (
+              <tr key={r.id} className="border-t">
+                <td>{r.name}</td>
+                <td>{r.date}</td>
+                <td className={r.type === 'expense' ? 'text-red-600' : 'text-green-600'}>{fmt.format(r.amount)}</td>
+                <td>{r.type === 'expense' ? 'Gasto' : 'Ingreso'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      {/* Modal configuración */}
+      <Modal open={configOpen} onClose={() => setConfigOpen(false)} title="Configuración finanzas">
+        <div className="space-y-3">
+          <label className="block">
+            Aportación Persona A
+            <input type="number" className="border rounded px-2 py-1 w-full" value={personA} onChange={e=>setPersonA(+e.target.value||0)} placeholder="€" />
+          </label>
+          <label className="block">
+            Aportación Persona B
+            <input type="number" className="border rounded px-2 py-1 w-full" value={personB} onChange={e=>setPersonB(+e.target.value||0)} placeholder="€" />
+          </label>
+          <label className="block">
+            Regalo estimado por invitado
+            <input type="number" className="border rounded px-2 py-1 w-full" value={giftPerGuest} onChange={e=>setGiftPerGuest(+e.target.value||0)} placeholder="€" />
+          </label>
+          <label className="block">
+            Número de invitados
+            <input type="number" className="border rounded px-2 py-1 w-full" value={guestCount} onChange={e=>setGuestCount(+e.target.value||0)} placeholder="€" />
+          </label>
+          <div className="text-right">
+            <Button onClick={() => setConfigOpen(false)}>Guardar</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal movimiento manual */}
+      <Modal open={manualOpen} onClose={() => setManualOpen(false)} title="Nuevo movimiento">
+        <div className="space-y-3">
+          <label className="block">
+            Concepto
+            <input type="text" className="border rounded px-2 py-1 w-full" value={newMovement.concept} onChange={e=>setNewMovement({...newMovement, concept:e.target.value})} />
+          </label>
+          <label className="block">
+            Monto (€)
+            <input type="number" className="border rounded px-2 py-1 w-full" value={newMovement.amount} onChange={e=>setNewMovement({...newMovement, amount:+e.target.value||0})} />
+          </label>
+          <label className="block">
+            Fecha
+            <input type="date" className="border rounded px-2 py-1 w-full" value={newMovement.date} onChange={e=>setNewMovement({...newMovement, date:e.target.value})} />
+          </label>
+          <label className="block">
+            Tipo
+            <select className="border rounded px-2 py-1 w-full" value={newMovement.type} onChange={e=>setNewMovement({...newMovement, type:e.target.value})}>
+              <option value="expense">Gasto</option>
+              <option value="income">Ingreso</option>
+            </select>
+          </label>
+          <div className="text-right space-x-2">
+            <Button variant="outline" onClick={()=>setManualOpen(false)}>Cancelar</Button>
+            <Button onClick={()=>{console.log('Movimiento guardado', newMovement); setManualOpen(false);}}>Guardar</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
+export default Finance;

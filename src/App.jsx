@@ -24,8 +24,16 @@ import Timing from './pages/protocolo/Timing';
 import Checklist from './pages/protocolo/Checklist';
 import AyudaCeremonia from './pages/protocolo/AyudaCeremonia';
 import DisenoWeb from './pages/DisenoWeb';
+import DisenosLayout from './pages/disenos/DisenosLayout';
+import DisenosInvitaciones from './pages/disenos/Invitaciones';
+import DisenosLogo from './pages/disenos/Logo';
+import MenuDiseno from './pages/disenos/Menu';
+import SeatingPlanPost from './pages/disenos/SeatingPlanPost';
+import MenuCatering from './pages/disenos/MenuCatering';
+import PapelesNombres from './pages/disenos/PapelesNombres';
 import Ideas from './pages/Ideas';
 import Buzon from './pages/Buzon';
+import Notificaciones from './pages/Notificaciones';
 
 function ProtectedRoute() {
   const { isAuthenticated } = useUserContext();
@@ -72,11 +80,23 @@ function App() {
                 <Route path="ayuda-ceremonia" element={<AyudaCeremonia />} />
               </Route>
               <Route path="perfil" element={<Perfil />} />
+               <Route path="notificaciones" element={<Notificaciones />} />
                 <Route path="buzon" element={<Buzon />} />
                <Route path="diseno-web" element={<DisenoWeb />} />
                <Route path="ideas" element={<Ideas />} />
+
+               {/* Rutas Diseños */}
+               <Route path="disenos" element={<DisenosLayout />}>
+                 <Route index element={<Navigate to="invitaciones" replace />} />
+                 <Route path="invitaciones" element={<DisenosInvitaciones />} />
+                 <Route path="logo" element={<DisenosLogo />} />
+                 <Route path="menu" element={<MenuDiseno />} />
+                 <Route path="seating-plan" element={<SeatingPlanPost />} />
+                 <Route path="menu-catering" element={<MenuCatering />} />
+                 <Route path="papeles-nombres" element={<PapelesNombres />} />
+               </Route>
               <Route path="more" element={<More />}>
-                <Route index element={<p>Selecciona una sección</p>} />
+                
               </Route>
 
 

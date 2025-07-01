@@ -1,10 +1,11 @@
 import React, { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUserContext } from '../context/UserContext';
 import { Card } from './ui/Card';
 import { Progress } from './ui/Progress';
 import Nav from './Nav';
 
-import { User, DollarSign, Calendar, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { User, DollarSign, Calendar, Users, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 
 import inspo1 from '../assets/inspo1.jpg';
@@ -13,6 +14,7 @@ import inspo3 from '../assets/inspo3.jpg';
 import inspo4 from '../assets/inspo4.jpg';
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const { role, userName, weddingName, progress, logoUrl } = useUserContext();
   const galleryRef = useRef(null);
   const scrollAmount = 300;
@@ -79,6 +81,32 @@ export default function HomePage() {
             {progress}% completado
           </p>
         </Card>
+      </section>
+
+      {/* Quick Actions */}
+      <section className="z-10 p-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Buscar proveedor', route: '/proveedores', icon: User },
+          { label: 'Añadir invitado', route: '/invitados#nuevo', icon: Users },
+          { label: 'Añadir movimiento', route: '/finance#nuevo', icon: DollarSign },
+          { label: 'Nueva nota', route: '/ideas#nueva', icon: Plus },
+        ].map((action, idx) => {
+          const Icon = action.icon;
+          return (
+            <Card
+              key={idx}
+              role="button"
+              onClick={() => navigate(action.route)}
+              className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-md hover:shadow-lg transition transform hover:scale-105 cursor-pointer"
+            >
+              <div className="flex items-center space-x-3">
+                <Icon className="text-pastel-blue" />
+                <span className="text-gray-700 font-medium">{action.label}</span>
+              </div>
+              <ChevronRight className="text-gray-400" />
+            </Card>
+          );
+        })}
       </section>
 
       {/* Stats Cards */}
