@@ -70,15 +70,10 @@ export default function More() {
             </div>
           )}
         </div>
-        <Link to="/perfil" className="bg-white p-4 rounded shadow hover:shadow-md flex flex-col">
-          <User size={32} className="text-blue-600 mb-2" />
-          <h2 className="font-semibold mb-1">Perfil</h2>
-          <p className="text-sm text-gray-600">Configura tu cuenta, roles y suscripciones.</p>
-        </Link>
       </div>
 
       {/* Content */}
-      <div className="mt-6 p-4 bg-gray-50 rounded">
+      <div className="mt-6">
         <Outlet />
       </div>
     </div>
