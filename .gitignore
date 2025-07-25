@@ -1,0 +1,28 @@
+# Dependencies/build
+node_modules/
+dist/
+backend/node_modules/
+functions/node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+backend/logs/
+
+# Temp files and secrets
+temp/
+serviceAccountKey.json
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Build output
+*.zip
+*.tgz
+
+# Vite cache
+vite_output.txt
